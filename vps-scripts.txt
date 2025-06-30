@@ -1,0 +1,56 @@
+# Scripts para VPS - RX Veículos
+
+## 1. Script de Deploy (deploy.sh)
+```bash
+#!/bin/bash
+cd /var/www/rx-veiculos
+git pull origin main
+pnpm install --frozen-lockfile
+pnpm run build
+pm2 restart rx-veiculos
+echo "Deploy concluído!"
+```
+
+## 2. Script de Monitor (monitor.sh)
+```bash
+#!/bin/bash
+echo "=== MONITOR RX VEÍCULOS ==="
+echo "CPU: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)%"
+echo "RAM: $(free -m | awk 'NR==2{printf "%.1f%%", $3*100/$2}')"
+echo "DISK: $(df -h / | awk 'NR==2{print $5}')"
+pm2 status
+```
+
+## 3. Script de Backup (backup.sh)
+```bash
+#!/bin/bash
+BACKUP_DIR="$HOME/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+mkdir -p $BACKUP_DIR
+tar -czf $BACKUP_DIR/backup_$DATE.tar.gz -C /var/www rx-veiculos
+echo "Backup criado: backup_$DATE.tar.gz"
+```
+
+## 4. Health Check (healthcheck.sh)
+```bash
+#!/bin/bash
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://seudominio.com)
+if [ $STATUS -eq 200 ]; then
+    echo "✅ App funcionando"
+else
+    echo "❌ App com problema - reiniciando..."
+    pm2 restart rx-veiculos
+fi
+```
+
+## 5. Cron Jobs
+```bash
+# Backup diário às 2h
+0 2 * * * /home/rxveiculos/backup.sh
+
+# Health check a cada 5 minutos  
+*/5 * * * * /home/rxveiculos/healthcheck.sh
+
+# Renovação SSL semanal
+0 3 * * 1 certbot renew --quiet
+``` 
