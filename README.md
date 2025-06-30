@@ -44,16 +44,25 @@ RX Veículos é uma plataforma moderna para compra e venda de veículos, desenvo
 
 ## 🚀 Como Executar
 
-### Pré-requisitos
+### ⚡ Instalação Super Rápida (Recomendado)
+
+**Uma linha apenas:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/marceloeliel/rx-git/master/quick-install.sh | bash
+```
+
+### 🛠️ Instalação Manual
+
+#### Pré-requisitos
 - Node.js 18+
 - pnpm ou npm
 - Conta Supabase
 - Conta ASAAS
 
-### Instalação
+#### Passos
 ```bash
 # Clone o repositório
-git clone https://github.com/SEU_USUARIO/rx-git.git
+git clone https://github.com/marceloeliel/rx-git.git
 cd rx-git
 
 # Instale dependências
@@ -70,6 +79,16 @@ pnpm dev
 pnpm build
 pnpm start
 ```
+
+### 🐳 Com Docker
+```bash
+# Clone e execute
+git clone https://github.com/marceloeliel/rx-git.git
+cd rx-git
+docker-compose up -d
+```
+
+📖 **Guia completo:** [INSTALL.md](INSTALL.md)
 
 ## 📱 PWA Features
 
