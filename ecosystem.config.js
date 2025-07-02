@@ -36,6 +36,9 @@ module.exports = {
     env_production: {
       NODE_ENV: 'production',
       PORT: 3000,
+      NEXT_PUBLIC_SUPABASE_URL: 'sua_url_supabase',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'sua_chave_anon_supabase',
+      SUPABASE_SERVICE_ROLE_KEY: 'sua_chave_service_role_supabase',
       // Adicione outras variáveis aqui
     }
   }]
