@@ -23,6 +23,7 @@ export default function TestePixStatusPage() {
     { status: "AWAITING_PAYMENT", label: "Aguardando", color: "bg-blue-100 text-blue-800" },
     { status: "RECEIVED", label: "Recebido", color: "bg-green-100 text-green-800" },
     { status: "CONFIRMED", label: "Confirmado", color: "bg-green-100 text-green-800" },
+    { status: "RECEIVED_IN_CASH", label: "Pago em Dinheiro", color: "bg-green-100 text-green-800" },
     { status: "OVERDUE", label: "Vencido", color: "bg-red-100 text-red-800" },
   ]
 
@@ -45,7 +46,7 @@ export default function TestePixStatusPage() {
         setPaymentData(data)
         
         // Verificar se está confirmado
-        if (data.status === 'RECEIVED' || data.status === 'CONFIRMED') {
+        if (data.status === 'RECEIVED' || data.status === 'CONFIRMED' || data.status === 'RECEIVED_IN_CASH') {
           toast.success("🎉 Pagamento Confirmado!")
         } else {
           toast.info(`Status atual: ${data.status}`)
@@ -106,7 +107,7 @@ export default function TestePixStatusPage() {
       const updatedData = { ...paymentData, status: newStatus }
       setPaymentData(updatedData)
       
-      if (newStatus === 'RECEIVED' || newStatus === 'CONFIRMED') {
+              if (newStatus === 'RECEIVED' || newStatus === 'CONFIRMED' || newStatus === 'RECEIVED_IN_CASH') {
         toast.success("🎉 Status simulado: Pagamento Confirmado!")
       } else {
         toast.info(`Status simulado: ${newStatus}`)
@@ -305,10 +306,11 @@ export default function TestePixStatusPage() {
               <ul className="list-disc list-inside space-y-1 text-gray-600">
                 <li><code>RECEIVED</code> - Pagamento recebido</li>
                 <li><code>CONFIRMED</code> - Pagamento confirmado</li>
+                <li><code>RECEIVED_IN_CASH</code> - Pagamento recebido em dinheiro</li>
               </ul>
               <p className="mt-3"><strong>Verificação no código:</strong></p>
               <code className="block bg-gray-100 p-2 rounded">
-                {`if (paymentData.status === 'RECEIVED' || paymentData.status === 'CONFIRMED') {
+                {`if (paymentData.status === 'RECEIVED' || paymentData.status === 'CONFIRMED' || paymentData.status === 'RECEIVED_IN_CASH') {
   setPaymentConfirmed(true)
   // Mostrar sucesso
 }`}

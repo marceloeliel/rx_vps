@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
-import { getAsaasCustomerId } from "@/lib/supabase/profiles"
+// import { getAsaasCustomerId } from "@/lib/supabase/profiles" // REMOVIDO - Sistema de pagamentos desabilitado
 import { toast } from "sonner"
 import {
   User,

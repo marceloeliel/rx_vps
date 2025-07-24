@@ -31,6 +31,8 @@ import { getImagensCarrossel, type ImagemCarrossel } from "@/lib/supabase/carros
 import { getVeiculosPublicos, type Veiculo } from "@/lib/supabase/veiculos"
 import { VeiculoDetalhesModal } from "@/components/veiculo-detalhes-modal"
 import { LocationBadge } from "@/components/location-badge"
+import PaidAdsSection from "@/components/PaidAdsSection"
+import { useSubscription } from "@/hooks/use-subscription"
 
 export default function HomePage() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -47,6 +49,17 @@ export default function HomePage() {
   const [loadingVeiculos, setLoadingVeiculos] = useState(true)
   const [selectedVeiculo, setSelectedVeiculo] = useState<Veiculo | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  
+  // Hook para verificar plano de assinatura
+  const { subscriptionStatus, profile } = useSubscription()
+
+  // Verificar se deve ocultar a seção de agências
+  const shouldHideAgencySection = () => {
+    // Verifica se o usuário é uma agência com plano ativo
+    return profile && 
+           profile.tipo_usuario === 'agencia' && 
+           subscriptionStatus?.hasAccess
+  }
 
   // Função para verificar se o veículo é novo (menos de 7 dias)
   const isVeiculoNovo = (dataCadastro: string | undefined) => {
@@ -365,55 +378,11 @@ export default function HomePage() {
         {/* Carousel Background */}
         <div className="absolute inset-0">
           {loadingCarousel ? (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center z-20">
-              <div className="text-center">
-                {/* Skeleton Loading */}
-                <div className="relative w-full h-[400px] sm:h-[500px] bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700 animate-pulse">
-                  {/* Shimmer Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 -translate-x-full animate-shimmer"></div>
-                  
-                  {/* Content Placeholder */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center space-y-6">
-                      {/* RX Autos Logo */}
-                      <div className="flex items-center justify-center gap-3 mb-4">
-                        <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center">
-                          <span className="text-white font-bold text-xl">RX</span>
-                        </div>
-                        <div className="text-white">
-                          <div className="text-2xl font-bold">RX Autos</div>
-                          <div className="text-xs text-white/70">Marketplace de Veículos</div>
-                        </div>
-                      </div>
-                      
-                      {/* Text Skeletons */}
-                      <div className="space-y-4">
-                        <div className="h-10 bg-white/20 rounded-lg w-96 mx-auto animate-pulse"></div>
-                        <div className="h-6 bg-white/15 rounded-lg w-80 mx-auto animate-pulse"></div>
-                        <div className="h-4 bg-white/10 rounded-lg w-64 mx-auto animate-pulse"></div>
-                      </div>
-                      
-                      {/* Loading Indicator */}
-                      <div className="flex items-center justify-center gap-3 mt-8">
-                        <div className="flex space-x-2">
-                          {[...Array(3)].map((_, i) => (
-                            <div
-                              key={i}
-                              className="w-3 h-3 bg-orange-500 rounded-full animate-bounce"
-                              style={{ animationDelay: `${i * 0.15}s` }}
-                            ></div>
-                          ))}
-                        </div>
-                        <span className="text-white/80 text-sm font-medium">Carregando carrossel...</span>
-                      </div>
-                      
-                      {/* Progress Bar */}
-                      <div className="w-48 h-1 bg-white/20 rounded-full mx-auto mt-4 overflow-hidden">
-                        <div className="h-full bg-orange-500 rounded-full animate-pulse" style={{ width: '60%' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+              {/* Subtle Loading Background */}
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 animate-pulse">
+                {/* Subtle Shimmer Effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -skew-x-12 -translate-x-full animate-shimmer"></div>
               </div>
             </div>
           ) : (
@@ -480,7 +449,8 @@ export default function HomePage() {
 
       </section>
 
-      {/* Agency Registration Section */}
+      {/* Agency Registration Section - Ocultar se é agência com plano ativo */}
+      {!shouldHideAgencySection() && (
       <section className="py-12 sm:py-16 bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="max-w-6xl mx-auto px-4">
           <Card className="relative overflow-hidden shadow-2xl border-0 bg-gradient-to-br from-orange-500 via-orange-600 to-red-600">
@@ -643,63 +613,8 @@ export default function HomePage() {
           </Card>
         </div>
       </section>
-
-      {/* Navigation Tabs */}
-      <section className="bg-white border-b border-gray-200 sticky top-20 z-40">
-        <div className="max-w-7xl mx-auto px-[0]">
-          <div className="flex items-center font-sans justify-center py-4">
-            <div className="flex items-center gap-8">
-              <button className="text-orange-500 font-medium border-b-2 border-orange-500 pb-2">Comprar carros</button>
-              <button className="text-gray-600 hover:text-orange-500 font-medium pb-2">Comprar motos</button>
-              <Link href="/cadastro-veiculo">
-                <button className="text-gray-600 hover:text-orange-500 font-medium pb-2">Quero vender</button>
-              </Link>
-              <button className="text-gray-600 hover:text-orange-500 font-medium pb-2">Quero financiar</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Search Section */}
-      <section className="bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center gap-4 mb-4">
-              <button className="bg-orange-500 text-white px-4 py-2 rounded-full text-sm font-medium">Todos</button>
-              <button className="text-gray-600 hover:text-orange-500 px-4 py-2 rounded-full text-sm font-medium">
-                Novos
-              </button>
-              <button className="text-gray-600 hover:text-orange-500 px-4 py-2 rounded-full text-sm font-medium">
-                Usados
-              </button>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="flex-1 relative">
-                <Input
-                  type="text"
-                  placeholder="Digite marca ou modelo do carro"
-                  className="pl-10 h-12 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
-                />
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
-              </div>
-              <Button className="bg-red-600 hover:bg-red-700 text-white px-8 h-12 font-medium">
-                VER OFERTAS (377.294)
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
+      )}
+      
       {/* Featured Vehicles */}
       <section className="py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4">
@@ -867,10 +782,44 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Soluções RX Autos */}
+      {/* Simulador RX Oficial - Barra */}
+      <section className="w-full h-[150px] bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform -translate-x-full animate-shimmer"></div>
+        
+        <div className="h-full flex items-center justify-center px-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between w-full max-w-7xl gap-4">
+            
+            {/* Conteúdo */}
+            <div className="text-center sm:text-left text-white">
+              <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
+                <h3 className="text-xl sm:text-2xl font-bold">Simulador RX Oficial</h3>
+                <Badge className="bg-white/20 text-white text-xs px-2 py-0.5 border border-white/30">GRATUITO</Badge>
+              </div>
+              
+              <p className="text-white/90 text-sm sm:text-base">
+                Simule seu financiamento com as melhores condições do mercado em segundos
+              </p>
+            </div>
+            
+            {/* Botão */}
+            <div className="flex-shrink-0">
+              <Link href="/simulador">
+                <Button 
+                  className="bg-white text-orange-600 hover:bg-orange-50 px-8 py-3 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 relative overflow-hidden group"
+                >
+                  <span className="relative z-10">Simular Agora</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-100/30 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Soluções */}
       <section className="leading-3 leading-7 py-12">
         <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">Soluções RX Autos</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-8">Soluções</h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="hover:shadow-lg transition-shadow h-full flex flex-col">
@@ -880,7 +829,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="font-bold text-lg mb-2">Carros por assinatura</h3>
                 <p className="text-gray-600 text-sm flex-1">Compre e encontre as melhores ofertas.</p>
-                <Badge className="bg-red-500 text-white text-xs mt-2 w-fit">NOVO</Badge>
+                <Badge className="bg-blue-500 text-white text-xs mt-2 w-fit">BREVE</Badge>
               </CardContent>
             </Card>
 
@@ -891,7 +840,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="font-bold text-lg mb-2">Serviços automotivos</h3>
                 <p className="text-gray-600 text-sm flex-1">Funilaria, manutenção e mais em oficinas perto de você.</p>
-                <Badge className="bg-red-500 text-white text-xs mt-2 w-fit">NOVO</Badge>
+                <Badge className="bg-blue-500 text-white text-xs mt-2 w-fit">BREVE</Badge>
               </CardContent>
             </Card>
 
@@ -924,40 +873,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Marcas Oficiais */}
-      <section className="py-12 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">Marcas Oficiais</h2>
-
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-6">
-            {[
-              { name: "BYD", logo: "https://www.google.com/url?sa=i&url=https%3A%2F%2Fbr.pinterest.com%2Fpin%2F92464598593321108%2F&psig=AOvVaw3j6cO3QHim29PavbSXANdE&ust=1750559986021000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCOiS9KG-gY4DFQAAAAAdAAAAABAE" },
-              { name: "Volkswagen", logo: "https://logospng.org/wp-content/uploads/volkswagen.png" },
-              { name: "Hyundai", logo: "https://cdn.mos.cms.futurecdn.net/b4VFMLdjLx3TudR9xCMeDT.jpg" },
-              { name: "Fiat", logo: "https://w7.pngwing.com/pngs/511/875/png-transparent-fiat-automobiles-fiat-500l-car-fiat-500-topolino-fiat-emblem-trademark-logo.png" },
-              { name: "Toyota", logo: "https://www.milework.com/images/thumbnails/1715/1500/detailed/12/88595658.jpg" },
-              { name: "Mercedes", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Mercedes-Logo.svg/2048px-Mercedes-Logo.svg.png" },
-            ].map((brand) => (
-              <div
-                key={brand.name}
-                className="bg-transparent rounded-full w-20 h-20 flex items-center justify-center shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-              >
-                <Image
-                  src={brand.logo || "/placeholder.svg"}
-                  alt={`Logo ${brand.name}`}
-                  width={50}
-                  height={50}
-                  className="object-contain w-12 h-12"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = "/placeholder.svg?height=40&width=40&text=" + brand.name
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Agências em Destaque - Componente Dinâmico */}
+      <PaidAdsSection maxAds={6} showTitle={true} />
 
       {/* Categorias */}
       <section className="py-12">
@@ -966,11 +883,11 @@ export default function HomePage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {[
-              { name: "Carros elétricos", image: "/placeholder.svg?height=200&width=300&text=Carros+Elétricos" },
-              { name: "Hatches", image: "/placeholder.svg?height=200&width=300&text=Hatches" },
-              { name: "Picapes", image: "/placeholder.svg?height=200&width=300&text=Picapes" },
-              { name: "Sedans", image: "/placeholder.svg?height=200&width=300&text=Sedans" },
-              { name: "SUVs", image: "/placeholder.svg?height=200&width=300&text=SUVs" },
+              { name: "Carros elétricos", image: "https://s2-autoesporte.glbimg.com/AF9s1Xm_Y85ejgJ3l6Ssz_vQlxY=/0x0:1920x1280/888x0/smart/filters:strip_icc()/i.s3.glbimg.com/v1/AUTH_cf9d035bf26b4646b105bd958f32089d/internal_photos/bs/2023/i/u/Y6RhJBSZu5wBqzisBngw/link-1-.jpg" },
+              { name: "Hatches", image: "https://123carros.com.br/files/wp-content/uploads/2018/01/hatch-620x445.jpg" },
+              { name: "Picapes", image: "https://cdn.autopapo.com.br/box/uploads/2020/02/17174829/nova-ram-2500-2020-dianteira-732x488.jpeg" },
+              { name: "Sedans", image: "https://i.bstr.es/drivingeco/2020/07/toyota-corolla-sedan-GR-7.jpg" },
+              { name: "SUVs", image: "https://mundodoautomovelparapcd.com.br/wp-content/uploads/2024/12/Chevrolet-Equinox-Activ-2025-6-1024x576.jpg" },
             ].map((category) => (
               <div key={category.name} className="relative rounded-lg overflow-hidden cursor-pointer group">
                 <Image
@@ -1036,37 +953,38 @@ export default function HomePage() {
                 title: "Japão 7 já pode ter blindagem certificado",
                 category: "Últimas notícias",
                 author: "Roberto Dutra",
-                image: "/placeholder.svg?height=200&width=300&text=Notícia+Blindagem",
+                image: "https://blog.usezapay.com.br/wp-content/uploads/2023/01/blindagem.jpg",
               },
-              {
-                title: "5 dicas do Fusca que servem até para os elétricos",
-                category: "Dicas",
-                author: "Evandro Knabben",
-                image: "/placeholder.svg?height=200&width=300&text=Dicas+Fusca",
-              },
+
               {
                 title: "Baterias de carros elétricos ganham 'segunda vida'",
                 category: "Últimas notícias",
                 author: "Roberto Dutra",
-                image: "/placeholder.svg?height=200&width=300&text=Baterias+Elétricas",
+                image: "https://www.portal-energia.com/wp-content/uploadsthumbs/primeira-bateria-reciclada-carros-eletricos.jpg",
               },
               {
                 title: "Audi do R$ 2 milhões desembarca no Brasil",
                 category: "Últimas notícias",
                 author: "Roberto Dutra",
-                image: "/placeholder.svg?height=200&width=300&text=Audi+Luxo",
+                image: "https://s2-autoesporte.glbimg.com/AEUVHn41ErI8FCT2IXNEoy2B52A=/0x0:1024x681/1008x0/smart/filters:strip_icc()/i.s3.glbimg.com/v1/AUTH_59edd422c0c84a879bd37670ae4f538a/internal_photos/bs/2020/2/7/jq7gbxQzCcVrDRyUiE5g/audi-r8-v10-9992-0345030909530633.jpg",
               },
               {
                 title: "Novo Hyundai HB20 deve ser lançado em outubro",
                 category: "Últimas notícias",
                 author: "André Deliberato",
-                image: "/placeholder.svg?height=200&width=300&text=Hyundai+HB20",
+                image: "https://i.ytimg.com/vi/iQOTHljrG2o/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLC3EobixvBJxVu1_gosvau1NsI5Hg",
               },
               {
                 title: "Depois de um longo tempo, Suzuki aponta para cima",
                 category: "Motos",
                 author: "Roberto Dutra",
-                image: "/placeholder.svg?height=200&width=300&text=Suzuki+Motos",
+                image: "https://www.webmotors.com.br/wp-content/uploads/2025/05/29135517/Suzuki-GSX-S-1000-GX-1-scaled.webp",
+              },
+              {
+                title: "5 dicas do Fusca que servem até para os elétricos",
+                category: "Últimas notícias",
+                author: "Roberto Dutra",
+                image: "https://ecdmpndeunbzhaihabvi.supabase.co/storage/v1/object/public/telas//ChatGPT%20Image%2017%20de%20jul.%20de%202025,%2010_11_02.png",
               },
             ].map((news, index) => (
               <Card key={index} className="hover:shadow-lg transition-shadow cursor-pointer">
@@ -1176,19 +1094,19 @@ export default function HomePage() {
                   </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-orange-500 transition-colors">
+                  <Link href="/veiculos" className="hover:text-orange-500 transition-colors">
                     Motos
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-orange-500 transition-colors">
+                  <Link href="/veiculos" className="hover:text-orange-500 transition-colors">
                     Caminhões
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-orange-500 transition-colors">
+                  <Link href="/veiculos" className="hover:text-orange-500 transition-colors">
                     Elétricos
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
@@ -1196,10 +1114,18 @@ export default function HomePage() {
             <div>
               <h3 className="font-bold mb-4">Contato</h3>
               <div className="space-y-2 text-sm text-gray-300">
-                <p>Av. Paulista, 1000</p>
-                <p>São Paulo, SP</p>
-                <p>contato@rxautos.com.br</p>
-                <p>(11) 3000-0000</p>
+                <p>Bahia, Brasil</p>
+                <p>WhatsApp: (73) 99937-7300</p>
+                <button 
+                  onClick={() => {
+                    const message = `Olá! Preciso de ajuda com a plataforma RX Veículos.`
+                    const whatsappUrl = `https://wa.me/5573999377300?text=${encodeURIComponent(message)}`
+                    window.open(whatsappUrl, '_blank')
+                  }}
+                  className="text-orange-400 hover:text-orange-300 transition-colors"
+                >
+                  Falar no WhatsApp
+                </button>
               </div>
             </div>
           </div>

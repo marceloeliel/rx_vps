@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { User } from "@supabase/supabase-js"
+import { checkUserPromotionalAccess, type PromotionalAccess } from "@/lib/supabase/promotions"
+import { checkTrialPeriod } from "@/lib/supabase/trial"
 
 export interface SubscriptionStatus {
   isActive: boolean
@@ -12,17 +14,26 @@ export interface SubscriptionStatus {
   daysUntilExpiration: number | null
   hasAccess: boolean
   needsRenewal: boolean
+  status?: string
+  subscription?: any
+  // Novos campos promocionais
+  isPromotional?: boolean
+  promotionalAccess?: PromotionalAccess | null
+  // Novos campos para período de teste
+  isInTrial?: boolean
+  trialDaysRemaining?: number | null
 }
 
 export interface UserProfile {
   id: string
   nome_completo: string
   email?: string
-  plano_atual?: string
-  plano_data_inicio?: string
-  plano_data_fim?: string
+  tipo_usuario?: string
   asaas_customer_id?: string
-  asaas_subscription_id?: string
+  // Novos campos promocionais
+  is_promotional_user?: boolean
+  promotional_end_date?: string
+  document_validated?: boolean
 }
 
 export function useSubscription() {
@@ -35,44 +46,124 @@ export function useSubscription() {
     expirationDate: null,
     daysUntilExpiration: null,
     hasAccess: false,
-    needsRenewal: false
+    needsRenewal: false,
+    status: undefined,
+    subscription: undefined,
+    isPromotional: false,
+    promotionalAccess: null,
+    isInTrial: false,
+    trialDaysRemaining: null
   })
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  // Calcular status da assinatura
-  const calculateSubscriptionStatus = (profile: UserProfile): SubscriptionStatus => {
-    const now = new Date()
-    
-    // Se não tem plano ativo
-    if (!profile.plano_atual || !profile.plano_data_fim) {
-      return {
-        isActive: false,
-        isExpired: false,
-        planType: null,
-        expirationDate: null,
-        daysUntilExpiration: null,
-        hasAccess: false,
-        needsRenewal: true
+  // Buscar dados da assinatura atual (incluindo promocional e trial)
+  const loadSubscriptionData = async (userId: string): Promise<SubscriptionStatus> => {
+    try {
+      // Primeiro, verificar período de teste
+      const trialStatus = await checkTrialPeriod(userId)
+      
+      if (trialStatus.isInTrial) {
+        return {
+          isActive: true,
+          isExpired: false,
+          planType: trialStatus.trialPeriod?.plan_type || 'basico',
+          expirationDate: new Date(trialStatus.trialPeriod?.end_date!),
+          daysUntilExpiration: trialStatus.daysRemaining || 0,
+          hasAccess: true,
+          needsRenewal: trialStatus.daysRemaining! <= 3,
+          status: 'trial',
+          subscription: {
+            plan_type: trialStatus.trialPeriod?.plan_type || 'basico',
+            end_date: trialStatus.trialPeriod?.end_date,
+            status: 'trial'
+          },
+          isPromotional: false,
+          promotionalAccess: null,
+          isInTrial: true,
+          trialDaysRemaining: trialStatus.daysRemaining
+        }
       }
+
+      // Se não está em trial, verificar acesso promocional
+      const promotionalAccess = await checkUserPromotionalAccess(userId)
+      
+      // Se tem acesso promocional ativo
+      if (promotionalAccess && promotionalAccess.has_access && promotionalAccess.is_promotional) {
+        const endDate = new Date(promotionalAccess.end_date!)
+        const now = new Date()
+        const daysUntilExpiration = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        
+        return {
+          isActive: true,
+          isExpired: endDate < now,
+          planType: 'promocional',
+          expirationDate: endDate,
+          daysUntilExpiration: daysUntilExpiration > 0 ? daysUntilExpiration : 0,
+          hasAccess: true,
+          needsRenewal: daysUntilExpiration <= 3,
+          status: 'promotional_active',
+          subscription: {
+            plan_type: 'promocional',
+            end_date: promotionalAccess.end_date,
+            status: 'promotional_active'
+          },
+          isPromotional: true,
+          promotionalAccess: promotionalAccess,
+          isInTrial: false,
+          trialDaysRemaining: null
+        }
+      }
+
+      // Se não tem acesso promocional, verificar plano pago
+      const response = await fetch(`/api/subscriptions?userId=${userId}`)
+      
+      if (response.ok) {
+        const result = await response.json()
+        
+        if (result.subscription && result.access) {
+          const subscription = result.subscription
+          const access = result.access
+          const now = new Date()
+          const endDate = new Date(subscription.end_date)
+          const daysUntilExpiration = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+          
+          return {
+            isActive: subscription.status === 'active',
+            isExpired: endDate < now,
+            planType: subscription.plan_type,
+            expirationDate: endDate,
+            daysUntilExpiration: daysUntilExpiration > 0 ? daysUntilExpiration : 0,
+            hasAccess: access.hasAccess,
+            needsRenewal: subscription.status === 'pending_payment' || (daysUntilExpiration <= 3),
+            status: subscription.status,
+            subscription: subscription,
+            isPromotional: false,
+            promotionalAccess: promotionalAccess,
+            isInTrial: false,
+            trialDaysRemaining: null
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ [SUBSCRIPTION] Erro ao buscar assinatura:", error)
     }
 
-    const expirationDate = new Date(profile.plano_data_fim)
-    const daysUntilExpiration = Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    const isExpired = expirationDate < now
-    const isActive = !isExpired
-    
-    // Considerar como "precisa renovar" se vence em 3 dias ou menos
-    const needsRenewal = daysUntilExpiration <= 3
-
+    // Fallback para usuários sem assinatura
     return {
-      isActive,
-      isExpired,
-      planType: profile.plano_atual,
-      expirationDate,
-      daysUntilExpiration,
-      hasAccess: isActive,
-      needsRenewal: needsRenewal || isExpired
+      isActive: false,
+      isExpired: false,
+      planType: null,
+      expirationDate: null,
+      daysUntilExpiration: null,
+      hasAccess: false,
+      needsRenewal: false,
+      status: undefined,
+      subscription: undefined,
+      isPromotional: false,
+      promotionalAccess: null,
+      isInTrial: false,
+      trialDaysRemaining: null
     }
   }
 
@@ -95,7 +186,13 @@ export function useSubscription() {
           expirationDate: null,
           daysUntilExpiration: null,
           hasAccess: false,
-          needsRenewal: false
+          needsRenewal: false,
+          status: undefined,
+          subscription: undefined,
+          isPromotional: false,
+          promotionalAccess: null,
+          isInTrial: false,
+          trialDaysRemaining: null
         })
         return
       }
@@ -103,10 +200,13 @@ export function useSubscription() {
       setUser(user)
       console.log("✅ [SUBSCRIPTION] Usuário autenticado:", user.email)
 
-      // Buscar perfil do usuário
+      // Buscar perfil do usuário (incluindo campos promocionais)
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("id, nome_completo, email, plano_atual, plano_data_inicio, plano_data_fim, asaas_customer_id, asaas_subscription_id")
+        .select(`
+          id, nome_completo, email, tipo_usuario, asaas_customer_id,
+          is_promotional_user, promotional_end_date, document_validated
+        `)
         .eq("id", user.id)
         .single()
 
@@ -120,22 +220,29 @@ export function useSubscription() {
           expirationDate: null,
           daysUntilExpiration: null,
           hasAccess: false,
-          needsRenewal: true
+          needsRenewal: true,
+          status: undefined,
+          subscription: undefined,
+          isPromotional: false,
+          promotionalAccess: null,
+          isInTrial: false,
+          trialDaysRemaining: null
         })
         return
       }
 
       setProfile(profileData)
       console.log("📋 [SUBSCRIPTION] Perfil carregado:", {
-        plano_atual: profileData.plano_atual,
-        plano_data_fim: profileData.plano_data_fim
+        id: profileData.id,
+        tipo_usuario: profileData.tipo_usuario,
+        is_promotional_user: profileData.is_promotional_user
       })
 
-      // Calcular status da assinatura
-      const status = calculateSubscriptionStatus(profileData)
+      // Buscar dados da assinatura (incluindo promocional)
+      const status = await loadSubscriptionData(user.id)
       setSubscriptionStatus(status)
       
-      console.log("📊 [SUBSCRIPTION] Status calculado:", status)
+      console.log("📊 [SUBSCRIPTION] Status da assinatura:", status)
 
     } catch (error) {
       console.error("❌ [SUBSCRIPTION] Erro ao carregar dados:", error)
@@ -152,7 +259,18 @@ export function useSubscription() {
 
     const planType = subscriptionStatus.planType
 
-    // Definir funcionalidades por plano
+    // Usuários promocionais têm acesso básico
+    if (subscriptionStatus.isPromotional) {
+      const promotionalFeatures = [
+        "create_vehicle", // Até 5 veículos durante promoção
+        "basic_listings",
+        "email_support",
+        "basic_stats"
+      ]
+      return promotionalFeatures.includes(feature)
+    }
+
+    // Definir funcionalidades por plano pago
     const planFeatures = {
       basico: [
         "create_vehicle", // Até 5 veículos
@@ -160,23 +278,24 @@ export function useSubscription() {
         "email_support",
         "basic_stats"
       ],
-      profissional: [
+      premium: [
         "create_vehicle", // Até 20 veículos
         "featured_listings",
-        "priority_support", 
-        "advanced_stats",
-        "custom_reports",
-        "api_integration"
+        "advanced_search",
+        "priority_support",
+        "detailed_stats",
+        "custom_branding"
       ],
-      empresarial: [
-        "unlimited_vehicles",
-        "premium_listings",
-        "24_7_support",
-        "complete_stats",
-        "advanced_reports",
-        "api_integration",
-        "admin_panel",
-        "multiple_users"
+      premium_plus: [
+        "create_vehicle", // Veículos ilimitados
+        "featured_listings",
+        "advanced_search",
+        "priority_support",
+        "detailed_stats",
+        "custom_branding",
+        "analytics_dashboard",
+        "api_access",
+        "white_label"
       ]
     }
 
@@ -184,52 +303,33 @@ export function useSubscription() {
     return allowedFeatures.includes(feature)
   }
 
-  // Verificar limites por plano
-  const getPlanLimits = () => {
-    const planType = subscriptionStatus.planType
+  // Verificar se o usuário pode criar mais veículos
+  const canCreateVehicle = (): boolean => {
+    return hasFeatureAccess("create_vehicle")
+  }
 
-    const planLimits = {
-      basico: {
-        maxVehicles: 5,
-        maxPhotosPerVehicle: 10,
-        featuredListings: false,
-        apiAccess: false
-      },
-      profissional: {
-        maxVehicles: 20,
-        maxPhotosPerVehicle: 15,
-        featuredListings: true,
-        apiAccess: true
-      },
-      empresarial: {
-        maxVehicles: -1, // Ilimitado
-        maxPhotosPerVehicle: 20,
-        featuredListings: true,
-        apiAccess: true
-      }
+  // Verificar se é usuário promocional
+  const isPromotionalUser = (): boolean => {
+    return subscriptionStatus.isPromotional || false
+  }
+
+  // Obter informações da promoção
+  const getPromotionalInfo = () => {
+    if (!subscriptionStatus.isPromotional || !subscriptionStatus.promotionalAccess) {
+      return null
     }
 
-    return planLimits[planType as keyof typeof planLimits] || planLimits.basico
+    return {
+      daysRemaining: subscriptionStatus.promotionalAccess.days_remaining,
+      endDate: subscriptionStatus.promotionalAccess.end_date,
+      campaignName: subscriptionStatus.promotionalAccess.campaign_name
+    }
   }
 
-  // Renovar assinatura (redirecionar para checkout)
-  const renewSubscription = () => {
-    const planType = subscriptionStatus.planType || "basico"
-    window.location.href = `/checkout?plano=${planType}&action=renewal`
-  }
-
-  // Atualizar dados do perfil
-  const refreshProfile = async () => {
-    await loadUserData()
-  }
-
-  // Effect para carregar dados iniciais
+  // Atualizar dados quando houver mudanças na autenticação
   useEffect(() => {
     loadUserData()
-  }, [])
 
-  // Effect para escutar mudanças de autenticação
-  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
         loadUserData()
@@ -239,14 +339,20 @@ export function useSubscription() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Função para recarregar dados
+  const reload = () => {
+    loadUserData()
+  }
+
   return {
     user,
     profile,
     subscriptionStatus,
     loading,
     hasFeatureAccess,
-    getPlanLimits,
-    renewSubscription,
-    refreshProfile
+    canCreateVehicle,
+    isPromotionalUser,
+    getPromotionalInfo,
+    reload
   }
 } 

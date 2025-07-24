@@ -1,269 +1,315 @@
 "use client"
 
-import { ReactNode } from "react"
-import { useSubscription } from "@/hooks/use-subscription"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { 
-  AlertTriangle, 
-  Clock, 
-  CreditCard, 
-  Lock, 
-  Zap,
-  Calendar,
-  ArrowRight
-} from "lucide-react"
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Loader2, AlertCircle, CreditCard, Clock, Gift, CheckCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { checkUserPromotionalAccess, type PromotionalAccess } from '@/lib/supabase/promotions'
+import { checkTrialPeriod } from '@/lib/supabase/trial'
 
 interface SubscriptionGuardProps {
-  children: ReactNode
-  feature?: string
-  fallback?: ReactNode
-  showWarning?: boolean // Mostrar aviso mesmo se ainda tem acesso
+  children: React.ReactNode
+  redirectTo?: string
+  showPaymentButton?: boolean
 }
 
-export function SubscriptionGuard({ 
-  children, 
-  feature, 
-  fallback,
-  showWarning = true 
-}: SubscriptionGuardProps) {
-  const { subscriptionStatus, loading, renewSubscription, hasFeatureAccess } = useSubscription()
+interface AccessStatus {
+  hasAccess: boolean
+  subscription: any | null
+  reason?: string
+  isPromotional?: boolean
+  promotionalAccess?: PromotionalAccess | null
+  isInTrial?: boolean
+  trialDaysRemaining?: number | null
+}
 
-  // Mostrar loading
-  if (loading) {
+export default function SubscriptionGuard({ 
+  children, 
+  redirectTo = '/planos',
+  showPaymentButton = true 
+}: SubscriptionGuardProps) {
+  const [isLoading, setIsLoading] = useState(true)
+  const [accessStatus, setAccessStatus] = useState<AccessStatus>({ 
+    hasAccess: false, 
+    subscription: null,
+    isPromotional: false,
+    promotionalAccess: null,
+    isInTrial: false,
+    trialDaysRemaining: null
+  })
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    checkSubscriptionStatus()
+  }, [])
+
+  const checkSubscriptionStatus = async () => {
+    try {
+      const supabase = createClient()
+      
+      // Verificar se há usuário logado
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      setUserEmail(user.email || null)
+
+      // Primeiro, verificar período de teste
+      const trialStatus = await checkTrialPeriod(user.id)
+      
+      if (trialStatus.isInTrial) {
+        setAccessStatus({
+          hasAccess: true,
+          subscription: {
+            plan_type: trialStatus.trialPeriod?.plan_type || 'basico',
+            status: 'trial',
+            end_date: trialStatus.trialPeriod?.end_date
+          },
+          reason: `Período de teste: ${trialStatus.daysRemaining} dias restantes`,
+          isPromotional: false,
+          promotionalAccess: null,
+          isInTrial: true,
+          trialDaysRemaining: trialStatus.daysRemaining
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Se não está em trial, verificar acesso promocional
+      const promotionalAccess = await checkUserPromotionalAccess(user.id)
+      
+      if (promotionalAccess && promotionalAccess.has_access && promotionalAccess.is_promotional) {
+        setAccessStatus({
+          hasAccess: true,
+          subscription: {
+            plan_type: 'promocional',
+            status: 'promotional_active',
+            end_date: promotionalAccess.end_date
+          },
+          reason: `Período promocional: ${promotionalAccess.days_remaining} dias restantes`,
+          isPromotional: true,
+          promotionalAccess: promotionalAccess
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Se não tem acesso promocional, verificar assinatura paga
+      try {
+        const response = await fetch(`/api/subscriptions?userId=${user.id}`)
+        
+        if (response.ok) {
+          const result = await response.json()
+          
+          if (result.access) {
+            setAccessStatus({
+              ...result.access,
+              isPromotional: false,
+              promotionalAccess: promotionalAccess
+            })
+          } else {
+            // Verificar se é usuário promocional expirado
+            if (promotionalAccess && promotionalAccess.is_promotional && !promotionalAccess.has_access) {
+              setAccessStatus({
+                hasAccess: false,
+                subscription: null,
+                reason: 'Seu período promocional expirou. Escolha um plano para continuar.',
+                isPromotional: false,
+                promotionalAccess: promotionalAccess
+              })
+            } else {
+              setAccessStatus({
+                hasAccess: false,
+                subscription: null,
+                reason: 'Nenhuma assinatura ativa encontrada',
+                isPromotional: false,
+                promotionalAccess: promotionalAccess
+              })
+            }
+          }
+        } else {
+          console.error('Erro ao verificar assinatura:', response.statusText)
+          setAccessStatus({
+            hasAccess: false,
+            subscription: null,
+            reason: 'Erro ao verificar status da assinatura',
+            isPromotional: false,
+            promotionalAccess: promotionalAccess
+          })
+        }
+      } catch (error) {
+        console.error('Erro na requisição de assinatura:', error)
+        setAccessStatus({
+          hasAccess: false,
+          subscription: null,
+          reason: 'Erro de conexão',
+          isPromotional: false,
+          promotionalAccess: promotionalAccess
+        })
+      }
+
+    } catch (error) {
+      console.error('Erro ao verificar usuário:', error)
+      router.push('/login')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-        <span className="ml-2 text-gray-600">Verificando assinatura...</span>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-500" />
+          <p className="mt-2 text-sm text-gray-600">Verificando assinatura...</p>
+        </div>
       </div>
     )
   }
 
-  // Se tem acesso, mostrar conteúdo (com possível aviso)
-  const hasAccess = feature ? hasFeatureAccess(feature) : subscriptionStatus.hasAccess
-
-  if (hasAccess) {
+  // Se tem acesso, mostrar conteúdo
+  if (accessStatus.hasAccess) {
     return (
       <>
-        {/* Aviso de renovação próxima */}
-        {showWarning && subscriptionStatus.needsRenewal && !subscriptionStatus.isExpired && (
-          <Alert className="mb-4 border-yellow-200 bg-yellow-50">
-            <Clock className="h-4 w-4 text-yellow-600" />
-            <AlertDescription className="text-yellow-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <strong>Sua assinatura vence em {subscriptionStatus.daysUntilExpiration} dias!</strong>
-                  <br />
-                  Renove agora para não perder o acesso às funcionalidades.
-                </div>
-                <Button 
-                  size="sm" 
-                  onClick={renewSubscription}
-                  className="bg-yellow-600 hover:bg-yellow-700"
-                >
-                  <CreditCard className="h-4 w-4 mr-1" />
-                  Renovar
-                </Button>
-              </div>
+        {/* Banner promocional */}
+        {accessStatus.isPromotional && accessStatus.promotionalAccess && (
+          <Alert className="mb-4 border-green-200 bg-green-50">
+            <Gift className="h-4 w-4" />
+            <AlertDescription className="text-green-800 flex items-center justify-between">
+              <span>
+                🎉 Período promocional ativo! {accessStatus.promotionalAccess.days_remaining} dias restantes
+                {accessStatus.promotionalAccess.campaign_name && ` (${accessStatus.promotionalAccess.campaign_name})`}
+              </span>
+              <Badge variant="outline" className="border-green-300 text-green-700">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Gratuito
+              </Badge>
             </AlertDescription>
           </Alert>
         )}
+        
+        {/* Alert de renovação próxima */}
+        {accessStatus.reason && !accessStatus.isPromotional && (
+          <Alert className="mb-4 border-orange-200 bg-orange-50">
+            <Clock className="h-4 w-4" />
+            <AlertDescription className="text-orange-800">
+              {accessStatus.reason}
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {children}
       </>
     )
   }
 
-  // Se não tem acesso, mostrar bloqueio
-  if (fallback) {
-    return <>{fallback}</>
-  }
-
-  return <SubscriptionBlockedScreen />
-}
-
-// Tela de bloqueio padrão
-function SubscriptionBlockedScreen() {
-  const { subscriptionStatus, renewSubscription, profile } = useSubscription()
-
-  const formatDate = (date: Date | null) => {
-    if (!date) return "Não definido"
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit", 
-      year: "numeric"
-    })
-  }
-
-  const getPlanName = (planType: string | null) => {
-    const plans = {
-      basico: "Plano Básico",
-      profissional: "Plano Profissional", 
-      empresarial: "Plano Empresarial"
-    }
-    return plans[planType as keyof typeof plans] || "Plano"
-  }
-
+  // Se não tem acesso, mostrar tela de bloqueio
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-            <Lock className="h-8 w-8 text-red-600" />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+            {accessStatus.promotionalAccess?.is_promotional ? (
+              <Gift className="h-6 w-6 text-orange-600" />
+            ) : (
+              <AlertCircle className="h-6 w-6 text-red-600" />
+            )}
           </div>
-          <CardTitle className="text-xl text-gray-900">
-            Assinatura Vencida
+          <CardTitle className="text-xl font-semibold text-gray-900">
+            {accessStatus.promotionalAccess?.is_promotional && !accessStatus.hasAccess 
+              ? 'Período Promocional Expirado' 
+              : 'Acesso Restrito'
+            }
           </CardTitle>
         </CardHeader>
-        
-        <CardContent className="space-y-4">
-          {/* Status da Assinatura */}
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <span className="font-medium text-red-800">Acesso Bloqueado</span>
-            </div>
+        <CardContent className="text-center space-y-4">
+          <p className="text-gray-600">
+            {accessStatus.reason || 'Você precisa de uma assinatura ativa para acessar esta área.'}
+          </p>
+          
+          {/* Mensagem especial para usuários promocionais expirados */}
+          {accessStatus.promotionalAccess?.is_promotional && !accessStatus.hasAccess && (
+            <Alert className="border-orange-200 bg-orange-50">
+              <Gift className="h-4 w-4" />
+              <AlertDescription className="text-orange-800">
+                Obrigado por experimentar nossos serviços! Seu período de {accessStatus.promotionalAccess.campaign_name || 'teste gratuito'} chegou ao fim.
+                Escolha um plano para continuar aproveitando todos os benefícios.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {accessStatus.subscription?.status === 'blocked' && (
+            <Alert className="border-red-200 bg-red-50">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-red-800">
+                Sua assinatura foi suspensa por falta de pagamento. 
+                Efetue o pagamento para reativar o acesso.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {accessStatus.subscription?.status === 'pending_payment' && (
+            <Alert className="border-orange-200 bg-orange-50">
+              <Clock className="h-4 w-4" />
+              <AlertDescription className="text-orange-800">
+                Pagamento pendente. Você tem até{' '}
+                {accessStatus.subscription.grace_period_ends_at 
+                  ? new Date(accessStatus.subscription.grace_period_ends_at).toLocaleDateString('pt-BR')
+                  : '5 dias'
+                } para efetuar o pagamento.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-2">
+            {/* Botão específico para ex-usuários promocionais */}
+            {accessStatus.promotionalAccess?.is_promotional && !accessStatus.hasAccess && (
+              <Button
+                onClick={() => router.push('/planos')}
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+              >
+                <Gift className="mr-2 h-4 w-4" />
+                Ver Planos Especiais
+              </Button>
+            )}
             
-            <div className="space-y-2 text-sm">
-              {subscriptionStatus.planType && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Plano:</span>
-                  <Badge variant="outline" className="text-red-600 border-red-600">
-                    {getPlanName(subscriptionStatus.planType)}
-                  </Badge>
-                </div>
-              )}
-              
-              {subscriptionStatus.expirationDate && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Venceu em:</span>
-                  <span className="font-medium text-red-600">
-                    {formatDate(subscriptionStatus.expirationDate)}
-                  </span>
-                </div>
-              )}
-              
-              {subscriptionStatus.daysUntilExpiration !== null && subscriptionStatus.daysUntilExpiration < 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Há quantos dias:</span>
-                  <span className="font-medium text-red-600">
-                    {Math.abs(subscriptionStatus.daysUntilExpiration)} dias
-                  </span>
-                </div>
-              )}
-            </div>
+            {showPaymentButton && !accessStatus.promotionalAccess?.is_promotional && (
+              <Button
+                onClick={() => router.push('/minhas-cobrancas')}
+                className="w-full"
+                variant="default"
+              >
+                <CreditCard className="mr-2 h-4 w-4" />
+                Ver Meus Pagamentos
+              </Button>
+            )}
+            
+            {!accessStatus.promotionalAccess?.is_promotional && (
+              <Button
+                onClick={() => router.push(redirectTo)}
+                variant="outline"
+                className="w-full"
+              >
+                Escolher Plano
+              </Button>
+            )}
           </div>
 
-          {/* Mensagem Principal */}
-          <div className="text-center">
-            <p className="text-gray-600 mb-4">
-              Sua assinatura expirou e o acesso às funcionalidades foi bloqueado. 
-              Renove agora para continuar usando todos os recursos.
-            </p>
-            
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-              <div className="flex items-center gap-2 text-blue-800 text-sm">
-                <Zap className="h-4 w-4" />
-                <span className="font-medium">Renovação Instantânea</span>
-              </div>
-              <p className="text-blue-700 text-xs mt-1">
-                Após o pagamento, o acesso é liberado imediatamente
-              </p>
-            </div>
-          </div>
-
-          {/* Botões de Ação */}
-          <div className="space-y-3">
-            <Button 
-              onClick={renewSubscription}
-              className="w-full bg-orange-500 hover:bg-orange-600"
-              size="lg"
-            >
-              <CreditCard className="h-4 w-4 mr-2" />
-              Renovar Assinatura
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => window.location.href = "/planos"}
-              className="w-full"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Ver Planos Disponíveis
-            </Button>
-          </div>
-
-          {/* Informações de Contato */}
-          <div className="text-center pt-4 border-t border-gray-200">
+          {userEmail && (
             <p className="text-xs text-gray-500">
-              Dúvidas? Entre em contato conosco
+              Logado como: {userEmail}
             </p>
-            <p className="text-xs text-orange-600 font-medium">
-              suporte@rxautos.com.br
-            </p>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
-  )
-}
-
-// Componente para mostrar aviso de limite atingido
-export function FeatureLimitReached({ 
-  feature, 
-  currentPlan, 
-  upgradeAction 
-}: { 
-  feature: string
-  currentPlan: string
-  upgradeAction: () => void 
-}) {
-  const getFeatureName = (feature: string) => {
-    const features = {
-      create_vehicle: "Criar Veículo",
-      unlimited_vehicles: "Veículos Ilimitados",
-      featured_listings: "Anúncios Destacados",
-      api_integration: "Integração API",
-      advanced_stats: "Estatísticas Avançadas"
-    }
-    return features[feature as keyof typeof features] || feature
-  }
-
-  const getPlanName = (planType: string) => {
-    const plans = {
-      basico: "Plano Básico",
-      profissional: "Plano Profissional", 
-      empresarial: "Plano Empresarial"
-    }
-    return plans[planType as keyof typeof plans] || planType
-  }
-
-  return (
-    <Card className="border-yellow-200 bg-yellow-50">
-      <CardContent className="p-6 text-center">
-        <div className="mx-auto w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
-          <Zap className="h-6 w-6 text-yellow-600" />
-        </div>
-        
-        <h3 className="text-lg font-semibold text-yellow-800 mb-2">
-          Limite Atingido
-        </h3>
-        
-        <p className="text-yellow-700 mb-4">
-          A funcionalidade <strong>{getFeatureName(feature)}</strong> não está disponível no seu plano atual 
-          (<strong>{getPlanName(currentPlan)}</strong>).
-        </p>
-        
-        <Button 
-          onClick={upgradeAction}
-          className="bg-yellow-600 hover:bg-yellow-700"
-        >
-          <ArrowRight className="h-4 w-4 mr-2" />
-          Fazer Upgrade
-        </Button>
-      </CardContent>
-    </Card>
   )
 } 

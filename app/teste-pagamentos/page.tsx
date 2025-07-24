@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { useAsaas } from "@/hooks/use-asaas"
+// import { useAsaas } from "@/hooks/use-asaas" // REMOVIDO - Sistema de pagamentos desabilitado
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import {
@@ -73,7 +73,7 @@ export default function TestePagamentosPage() {
     description: "Assinatura Plano Básico",
   })
 
-  const { createCustomer, createPayment, createSubscription } = useAsaas()
+  // const { createCustomer, createPayment, createSubscription } = useAsaas() // REMOVIDO - Sistema de pagamentos desabilitado
 
   // Carregar usuário atual
   useEffect(() => {

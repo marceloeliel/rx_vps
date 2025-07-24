@@ -31,14 +31,34 @@ export interface UserProfile {
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const supabase = createClient()
 
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
+  console.log('🔍 [PROFILES] Buscando perfil para usuário:', userId)
+  
+  try {
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
 
-  if (error) {
-    console.error("Erro ao buscar perfil:", error)
+    if (error) {
+      // Se o erro for "não encontrado", não é realmente um erro
+      if (error.code === 'PGRST116') {
+        console.log('ℹ️ [PROFILES] Perfil não encontrado para usuário:', userId)
+        return null
+      }
+
+      console.error("❌ [PROFILES] Erro ao buscar perfil:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        userId: userId
+      })
+      return null
+    }
+
+    console.log('✅ [PROFILES] Perfil encontrado:', data ? 'Sim' : 'Não')
+    return data
+  } catch (error) {
+    console.error("❌ [PROFILES] Erro inesperado ao buscar perfil:", error)
     return null
   }
-
-  return data
 }
 
 export async function createUserProfile(
@@ -204,190 +224,90 @@ export async function upsertUserProfile(
 ): Promise<UserProfile | null> {
   const supabase = createClient()
 
-  console.log("💾 [UPSERT_PROFILE] === INICIANDO SALVAMENTO ===")
-  console.log("💾 [UPSERT_PROFILE] UserId:", userId)
-  console.log("💾 [UPSERT_PROFILE] Dados recebidos:", profileData)
+  console.log("🔄 [PROFILES] Iniciando upsert do perfil:", {
+    userId,
+    ...profileData
+  })
 
   try {
-    // Limpar e validar dados antes de salvar
-    const cleanData = {
+    // Primeiro, verificar se o perfil existe
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single()
+
+    // Preparar dados para inserção/atualização
+    const updatedData = {
       ...profileData,
-      cpf: profileData.cpf ? profileData.cpf.replace(/\D/g, "") : undefined,
-      cnpj: profileData.cnpj ? profileData.cnpj.replace(/\D/g, "") : undefined,
-      whatsapp: profileData.whatsapp ? profileData.whatsapp.replace(/\D/g, "") : undefined,
-      cep: profileData.cep ? profileData.cep.replace(/\D/g, "") : undefined,
+      updated_at: new Date().toISOString(),
     }
 
-    // Remover campos undefined e vazios para evitar problemas
-    const filteredData = Object.fromEntries(
-      Object.entries(cleanData).filter(([_, value]) => 
-        value !== undefined && value !== null && value !== ""
-      )
-    )
+    if (!existingProfile) {
+      console.log("➕ [PROFILES] Perfil não existe, criando novo...")
+      // Se não existe, criar novo perfil
+      const { data: insertedProfile, error: insertError } = await supabase
+        .from("profiles")
+        .insert({
+          id: userId,
+          ...updatedData,
+          created_at: new Date().toISOString(),
+          perfil_configurado: true
+        })
+        .select()
+        .single()
 
-    console.log("🔧 [UPSERT_PROFILE] Dados limpos:", filteredData)
+      if (insertError) {
+        console.error("❌ [PROFILES] Erro ao criar perfil:", insertError)
+        return null
+      }
 
-    // Tentar UPSERT padrão primeiro
-    const { data, error } = await supabase
+      console.log("✅ [PROFILES] Perfil criado com sucesso!")
+      return insertedProfile
+    }
+
+    // Se existe, atualizar
+    console.log("🔄 [PROFILES] Perfil existe, atualizando...")
+    const { data: updatedProfile, error: updateError } = await supabase
       .from("profiles")
-      .upsert({
-        id: userId,
-        ...filteredData,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: "id"
-      })
+      .update(updatedData)
+      .eq("id", userId)
       .select()
       .single()
 
-    if (error) {
-      console.error("❌ [UPSERT_PROFILE] Erro no UPSERT:", {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        errorObject: JSON.stringify(error),
-        errorType: typeof error,
-        errorKeys: Object.keys(error || {})
-      })
-
-      // CRÍTICO: Detectar erro vazio de múltiplas formas
-      const errorStr = JSON.stringify(error)
-      const isEmptyError = (
-        !error.code || 
-        !error.message || 
-        error.message === '{}' || 
-        errorStr === '{}' || 
-        errorStr === '[]' ||
-        Object.keys(error || {}).length === 0 ||
-        (error.message && error.message.trim() === '')
-      )
-      
-      if (isEmptyError) {
-        console.log("🚨 [UPSERT_PROFILE] ERRO VAZIO CRÍTICO DETECTADO!")
-        console.log("🚨 [UPSERT_PROFILE] Error string:", errorStr)
-        console.log("🚨 [UPSERT_PROFILE] Error keys:", Object.keys(error || {}))
-        console.log("🆘 [UPSERT_PROFILE] Tentando fallback de emergência...")
-        
-        const fallbackResult = await saveUserProfileFallback(userId, filteredData)
-        
-        if (fallbackResult) {
-          console.log("✅ [UPSERT_PROFILE] Fallback de emergência funcionou!")
-          return fallbackResult
-        } else {
-          console.error("❌ [UPSERT_PROFILE] Fallback também falhou!")
-          throw new Error("ERRO CRÍTICO: Execute o comando SQL: ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;")
-        }
-      }
-
-      // Tratar erros específicos
-      if (error.code === '42501') {
-        console.error("❌ [UPSERT_PROFILE] ERRO RLS: Row Level Security bloqueando operação")
-        throw new Error("Erro de permissão. Execute o script SQL de correção.")
-      }
-
-      if (error.code === '23505') {
-        console.error("❌ [UPSERT_PROFILE] ERRO: Violação de chave única")
-        throw new Error("CPF ou CNPJ já estão sendo usados por outro usuário.")
-      }
-
-      if (error.code === '23502') {
-        console.error("❌ [UPSERT_PROFILE] ERRO: Campo obrigatório não preenchido")
-        throw new Error("Campos obrigatórios não preenchidos.")
-      }
-
-      // Erro genérico com informações
-      throw new Error(`Erro ao salvar perfil: ${error.message || error.code || 'Erro desconhecido'}`)
+    if (updateError) {
+      console.error("❌ [PROFILES] Erro ao atualizar perfil:", updateError)
+      return null
     }
 
-    console.log("✅ [UPSERT_PROFILE] Perfil salvo com sucesso!")
-    console.log("✅ [UPSERT_PROFILE] Dados salvos:", data)
-    
-    return data
+    console.log("✅ [PROFILES] Perfil atualizado com sucesso!")
+    return updatedProfile
 
-  } catch (error: any) {
-    console.error("❌ [UPSERT_PROFILE] Erro inesperado:", error)
-    console.error("❌ [UPSERT_PROFILE] Error type:", typeof error)
-    console.error("❌ [UPSERT_PROFILE] Error string:", JSON.stringify(error))
+  } catch (error) {
+    console.error("❌ [PROFILES] Erro inesperado no upsert:", error)
     
-    // Se for um erro que já tratamos, re-lançar
-    if (error.message && (
-      error.message.includes("Erro de permissão") ||
-      error.message.includes("CPF ou CNPJ") ||
-      error.message.includes("Campos obrigatórios") ||
-      error.message.includes("Erro ao salvar") ||
-      error.message.includes("ERRO CRÍTICO")
-    )) {
-      throw error
-    }
-    
-    // Para erros completamente inesperados, tentar fallback uma última vez
-    console.log("🆘 [UPSERT_PROFILE] Tentando fallback final de emergência...")
-    
-    try {
-      const fallbackResult = await saveUserProfileFallback(userId, profileData)
-      
-      if (fallbackResult) {
-        console.log("✅ [UPSERT_PROFILE] Fallback final funcionou!")
-        return fallbackResult
-      }
-    } catch (fallbackError) {
-      console.error("❌ [UPSERT_PROFILE] Fallback final também falhou:", fallbackError)
-    }
-    
-    // Erro completamente inesperado
-    throw new Error(`ERRO INTERNO: ${error.message || 'Execute o script SQL de correção'}`)
+    // Tentar fallback em caso de erro
+    console.log("🔄 [PROFILES] Tentando fallback...")
+    return saveUserProfileFallback(userId, profileData)
   }
 }
 
-// Função para salvar o customer_id do Asaas no perfil
-export async function saveAsaasCustomerId(
-  userId: string,
-  asaasCustomerId: string
-): Promise<boolean> {
-  // Usar client normal - o RLS já foi corrigido
+// Funções Asaas Customer ID
+export async function saveAsaasCustomerId(userId: string, customerId: string): Promise<boolean> {
   const supabase = createClient()
 
-  console.log("💾 [PROFILES] === INICIANDO SALVAMENTO ===")
-  console.log("💾 [PROFILES] UserId:", userId)
-  console.log("💾 [PROFILES] AsaasCustomerId:", asaasCustomerId)
-
   try {
-    // Tentar UPSERT simples
-    console.log("🔧 [PROFILES] Fazendo UPSERT...")
-    
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("profiles")
-      .upsert({
-        id: userId,
-        nome_completo: "MARCELO ELIEL DE SOUZA",
-        email: "marcelo@teste.com",
-        whatsapp: "61999855068",
-        tipo_usuario: "cliente",
-        perfil_configurado: false,
-        asaas_customer_id: asaasCustomerId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: "id"
-      })
-      .select("id, asaas_customer_id")
+      .update({ asaas_customer_id: customerId })
+      .eq("id", userId)
 
     if (error) {
-      console.error("❌ [PROFILES] Erro no UPSERT:", error)
-      
-      // Se der erro de RLS, orientar o usuário
-      if (error.code === '42501') {
-        console.error("❌ [PROFILES] ERRO RLS: Execute o script SQL fix-rls-final.sql")
-        console.error("❌ [PROFILES] Ou execute: ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;")
-      }
-      
+      console.error("❌ [PROFILES] Erro ao salvar customer ID:", error)
       return false
     }
 
-    console.log("✅ [PROFILES] UPSERT bem-sucedido!")
-    console.log("✅ [PROFILES] Dados salvos:", data)
-    
+    console.log("✅ [PROFILES] Customer ID salvo:", customerId)
     return true
   } catch (error) {
     console.error("❌ [PROFILES] Erro inesperado:", error)
@@ -395,62 +315,24 @@ export async function saveAsaasCustomerId(
   }
 }
 
-// Função para buscar o customer_id do Asaas do usuário
 export async function getAsaasCustomerId(userId: string): Promise<string | null> {
   const supabase = createClient()
-
-  console.log("🔍 [GET_CUSTOMER_ID] Buscando customer_id para userId:", userId)
 
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .select("asaas_customer_id, nome_completo, email")
+      .select("asaas_customer_id")
       .eq("id", userId)
-      .maybeSingle()
+      .single()
 
     if (error) {
-      console.error("❌ [GET_CUSTOMER_ID] Erro ao buscar customer_id:", error)
+      console.error("❌ [PROFILES] Erro ao buscar customer ID:", error)
       return null
     }
 
-    // Se não encontrou o usuário
-    if (!data) {
-      console.log("⚠️ [GET_CUSTOMER_ID] Usuário não encontrado na tabela profiles")
-      console.log("💡 [GET_CUSTOMER_ID] DICA: Execute o script SQL final-solution.sql")
-      return null
-    }
-
-    console.log("✅ [GET_CUSTOMER_ID] Usuário encontrado:", data.nome_completo, data.email)
-
-    // Se não tem customer_id
-    if (!data.asaas_customer_id) {
-      console.log("ℹ️ [GET_CUSTOMER_ID] Customer_id não encontrado para userId:", userId)
-      console.log("💡 [GET_CUSTOMER_ID] Será criado automaticamente na próxima cobrança")
-      return null
-    }
-
-    console.log("✅ [GET_CUSTOMER_ID] Customer_id encontrado:", data.asaas_customer_id)
-    return data.asaas_customer_id
+    return data?.asaas_customer_id || null
   } catch (error) {
-    console.error("❌ [GET_CUSTOMER_ID] Erro inesperado:", error)
+    console.error("❌ [PROFILES] Erro inesperado:", error)
     return null
   }
-}
-
-// Função para buscar usuário pelo customer_id do Asaas
-export async function getUserByAsaasCustomerId(asaasCustomerId: string): Promise<UserProfile | null> {
-  const supabase = createClient()
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("asaas_customer_id", asaasCustomerId)
-    .maybeSingle()
-
-  if (error) {
-    console.error("❌ Erro ao buscar usuário pelo customer_id do Asaas:", error)
-    return null
-  }
-
-  return data
 }

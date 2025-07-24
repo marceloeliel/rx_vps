@@ -19,6 +19,8 @@ import {
   ExternalLink,
   Eye,
   ChevronRight,
+  Shield,
+  AlertTriangle,
 } from "lucide-react"
 
 interface Payment {
@@ -44,6 +46,15 @@ interface PaymentStats {
   valor_pago: number
 }
 
+interface SubscriptionInfo {
+  id: string
+  plan_type: string
+  plan_value: number
+  status: string
+  end_date: string
+  grace_period_ends_at?: string
+}
+
 export function DashboardCobrancas() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [stats, setStats] = useState<PaymentStats>({
@@ -55,6 +66,7 @@ export function DashboardCobrancas() {
     valor_pendente: 0,
     valor_pago: 0,
   })
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -63,6 +75,22 @@ export function DashboardCobrancas() {
   useEffect(() => {
     loadUserPayments()
   }, [])
+
+  const loadSubscriptionInfo = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/subscriptions?userId=${userId}`)
+      
+      if (response.ok) {
+        const result = await response.json()
+        if (result.subscription) {
+          setSubscription(result.subscription)
+          console.log("✅ [DASHBOARD-COBRANCAS] Assinatura carregada:", result.subscription)
+        }
+      }
+    } catch (error) {
+      console.error("❌ [DASHBOARD-COBRANCAS] Erro ao carregar assinatura:", error)
+    }
+  }
 
   const loadUserPayments = async () => {
     try {
@@ -82,26 +110,52 @@ export function DashboardCobrancas() {
 
       console.log("✅ [DASHBOARD-COBRANCAS] Usuário autenticado:", user.id)
 
-      // 2. Buscar asaas_customer_id do usuário
-      const { data: profile } = await supabase
+      // 2. Buscar informações da assinatura
+      await loadSubscriptionInfo(user.id)
+
+      // 3. Buscar asaas_customer_id do usuário
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("asaas_customer_id")
         .eq("id", user.id)
         .single()
 
+      if (profileError) {
+        setError("Erro ao buscar perfil do usuário.")
+        return
+      }
+
       if (!profile?.asaas_customer_id) {
         console.log("ℹ️ [DASHBOARD-COBRANCAS] Usuário sem customer_id, sem cobranças")
         setPayments([])
+        setError("Você ainda não possui cobranças geradas.")
         return
       }
 
       console.log("✅ [DASHBOARD-COBRANCAS] Customer_id encontrado:", profile.asaas_customer_id)
 
       // 3. Buscar pagamentos do cliente usando a nova API que aceita customer_id diretamente
-      const response = await fetch(`/api/asaas/payments/customer/${profile.asaas_customer_id}`)
+      let response
+      try {
+        response = await fetch(`/api/asaas/payments/customer/${profile.asaas_customer_id}`)
+      } catch (fetchError) {
+        setError("Erro de conexão com o servidor de cobranças.")
+        return
+      }
       
       if (!response.ok) {
-        throw new Error("Erro ao buscar pagamentos")
+        let errorMsg = "Erro ao buscar cobranças."
+        try {
+          const errorData = await response.json()
+          if (errorData.error?.includes('ASAAS_API_KEY não configurada')) {
+            console.log("⚠️ [DASHBOARD-COBRANCAS] API Asaas não configurada")
+            errorMsg = "ASAAS_API_KEY não configurada no ambiente do servidor. Reinicie o servidor e confira o .env."
+          } else {
+            errorMsg = errorData?.error || errorMsg
+          }
+        } catch {}
+        setError(errorMsg)
+        return
       }
 
       const paymentsData = await response.json()
@@ -111,10 +165,11 @@ export function DashboardCobrancas() {
       
       setPayments(paymentsList)
       calculateStats(paymentsList)
+      setError(null)
 
     } catch (error: any) {
       console.error("❌ [DASHBOARD-COBRANCAS] Erro:", error)
-      setError(error.message)
+      setError("Erro inesperado ao carregar cobranças.")
       toast.error("Erro ao carregar cobranças")
     } finally {
       setLoading(false)
@@ -174,6 +229,7 @@ export function DashboardCobrancas() {
     switch (status) {
       case "RECEIVED":
       case "CONFIRMED":
+      case "RECEIVED_IN_CASH":
         return <Badge className="bg-green-100 text-green-800 text-xs">✅ Pago</Badge>
       case "PENDING":
       case "AWAITING_PAYMENT":
@@ -212,6 +268,48 @@ export function DashboardCobrancas() {
     return new Date(dateString).toLocaleDateString("pt-BR")
   }
 
+  const getDaysUntilExpiration = (endDateString: string) => {
+    const now = new Date()
+    const endDate = new Date(endDateString)
+    const diffTime = endDate.getTime() - now.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays > 0 ? diffDays : 0
+  }
+
+  const getSubscriptionStatusBadge = (status: string, endDate: string, gracePeriodEnd?: string) => {
+    const now = new Date()
+    const end = new Date(endDate)
+    const isExpired = end < now
+
+    switch (status) {
+      case 'active':
+        if (isExpired) {
+          return <Badge className="bg-orange-100 text-orange-800">Renovação Pendente</Badge>
+        }
+        return <Badge className="bg-green-100 text-green-800">Ativo</Badge>
+      
+      case 'pending_payment':
+        if (gracePeriodEnd) {
+          const grace = new Date(gracePeriodEnd)
+          const inGracePeriod = now <= grace
+          
+          if (inGracePeriod) {
+            return <Badge className="bg-orange-100 text-orange-800">Período de Tolerância</Badge>
+          }
+        }
+        return <Badge className="bg-red-100 text-red-800">Pagamento Pendente</Badge>
+      
+      case 'blocked':
+        return <Badge className="bg-red-100 text-red-800">Bloqueado</Badge>
+      
+      case 'cancelled':
+        return <Badge className="bg-gray-100 text-gray-800">Cancelado</Badge>
+      
+      default:
+        return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-4 p-4 md:p-0">
@@ -244,18 +342,10 @@ export function DashboardCobrancas() {
 
   if (error) {
     return (
-      <div>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <XCircle className="h-8 md:h-12 w-8 md:w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-base md:text-lg font-semibold mb-2">Erro ao carregar cobranças</h3>
-            <p className="text-sm md:text-base text-gray-600 mb-4">{error}</p>
-            <Button onClick={loadUserPayments} size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Tentar novamente
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col items-center justify-center min-h-[300px] text-center">
+        <XCircle className="h-10 w-10 text-red-500 mb-2" />
+        <p className="text-lg font-semibold text-red-700 mb-2">{error}</p>
+        <Button onClick={loadUserPayments} className="mt-2">Tentar Novamente</Button>
       </div>
     )
   }
@@ -351,6 +441,53 @@ export function DashboardCobrancas() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Informações da Assinatura */}
+      {subscription && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-blue-800">
+              <Shield className="h-5 w-5" />
+              <span>Informações do Plano</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg p-3">
+                <p className="text-xs text-blue-600 font-medium">Plano Atual</p>
+                <p className="font-bold text-blue-900 capitalize">
+                  {subscription.plan_type.replace('_', ' ')}
+                </p>
+                <p className="text-sm text-blue-700">
+                  {formatPrice(subscription.plan_value)}/mês
+                </p>
+              </div>
+              
+              <div className="bg-white rounded-lg p-3">
+                <p className="text-xs text-blue-600 font-medium">Vencimento do Plano</p>
+                <p className="font-bold text-blue-900">
+                  {formatDate(subscription.end_date)}
+                </p>
+                <p className="text-sm text-blue-700">
+                  {getDaysUntilExpiration(subscription.end_date)} dias restantes
+                </p>
+              </div>
+              
+              <div className="bg-white rounded-lg p-3">
+                <p className="text-xs text-blue-600 font-medium">Status da Assinatura</p>
+                <div className="mt-1">
+                  {getSubscriptionStatusBadge(subscription.status, subscription.end_date, subscription.grace_period_ends_at)}
+                </div>
+                {subscription.grace_period_ends_at && subscription.status === 'pending_payment' && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    Tolerância até: {formatDate(subscription.grace_period_ends_at)}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lista de Cobranças - Layout mobile otimizado */}
       <Card>

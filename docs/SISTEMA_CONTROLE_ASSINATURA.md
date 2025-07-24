@@ -14,7 +14,7 @@ Sistema completo de controle de assinatura que bloqueia automaticamente o acesso
 
 ### 📊 **Limites por Plano**
 
-#### **Plano Básico (R$ 49,90/mês)**
+#### **Plano Básico (R$ 59,90/mês)**
 - ✅ Até 5 veículos
 - ✅ 10 fotos por veículo
 - ✅ Anúncios básicos
@@ -22,24 +22,34 @@ Sistema completo de controle de assinatura que bloqueia automaticamente o acesso
 - ❌ Anúncios destacados
 - ❌ Acesso à API
 
-#### **Plano Profissional (R$ 99,90/mês)**
-- ✅ Até 20 veículos
+#### **Plano Profissional (R$ 299,00/mês)**
+- ✅ Até 30 veículos
 - ✅ 15 fotos por veículo
 - ✅ Anúncios destacados
 - ✅ Suporte prioritário
 - ✅ Estatísticas avançadas
-- ✅ Acesso à API
-- ❌ Painel administrativo
+- ✅ 3 destaques de veículos
+- ✅ Painel administrativo
 
-#### **Plano Empresarial (R$ 199,90/mês)**
-- ✅ Veículos ilimitados
+#### **Plano Empresarial (R$ 897,90/mês)**
+- ✅ Até 400 veículos
 - ✅ 20 fotos por veículo
 - ✅ Anúncios premium
 - ✅ Suporte 24/7
 - ✅ Estatísticas completas
-- ✅ Acesso à API
+- ✅ 40 destaques de veículos
 - ✅ Painel administrativo
-- ✅ Múltiplos usuários
+
+#### **Plano Ilimitado (R$ 1.897,90/mês)**
+- ✅ Veículos ilimitados
+- ✅ 20 fotos por veículo
+- ✅ Anúncios premium
+- ✅ Suporte 24/7 prioritário
+- ✅ Estatísticas completas
+- ✅ 100 destaques de veículos
+- ✅ Painel administrativo
+- ✅ Acesso API exclusivo
+- ✅ Consultoria dedicada
 
 ## 🛠️ Componentes Implementados
 

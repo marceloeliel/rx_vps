@@ -1,69 +1,116 @@
 import { NextRequest, NextResponse } from "next/server"
+import { headers } from "next/headers"
 
-const ASAAS_API_URL = "https://api.asaas.com/v3"
-const ASAAS_API_KEY = "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjhlZjU3ZGQ3LTA2NjctNDNjYi1hNjYwLTIyOGE3MGM5MTcxNTo6JGFhY2hfMDgxODBjMjQtZWE1YS00MGNlLTg0MjEtMzI0OTY3MGM5MzBj" // Token de produção antes
+// Configurações fixas para sandbox
+const ASAAS_API_KEY = "$aact_hmlg_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmI2M2RmYjNlLTgzMjMtNDlhYy04ZWM5LWQyODFhNzUyMDYwZTo6JGFhY2hfY2MyOTEzZDItMjZlMy00ZDQ0LWIzZTctZjdhYjEyNzc2MWIz"
+const ASAAS_BASE_URL = "https://api-sandbox.asaas.com"
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ customerId: string }> }
 ) {
-  const { customerId } = await params
-  console.log("🚀 [PAYMENTS-CUSTOMER] Iniciando busca de pagamentos para customer:", customerId)
-  
   try {
-    if (!ASAAS_API_KEY) {
-      console.log("❌ [PAYMENTS-CUSTOMER] Token não encontrado")
+    const { customerId } = await params
+    console.log("🚀 [PAYMENTS-CUSTOMER] Iniciando busca de pagamentos para customer:", customerId)
+
+    if (!customerId || customerId === 'undefined' || customerId === 'null') {
+      console.log("❌ [PAYMENTS-CUSTOMER] CustomerId inválido:", customerId)
       return NextResponse.json(
-        { error: "ASAAS_API_KEY não configurada" },
-        { status: 500 }
+        { error: "CustomerId inválido" },
+        { status: 400 }
       )
     }
 
-    console.log("🔍 [PAYMENTS-CUSTOMER] Buscando pagamentos para customer:", customerId)
+    // Adicionar timeout para evitar travamento
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 segundos
 
-    // Buscar pagamentos do cliente no Asaas
-    const response = await fetch(`${ASAAS_API_URL}/payments?customer=${customerId}&limit=50&offset=0`, {
-      headers: {
-        "access_token": ASAAS_API_KEY,
-      },
-    })
-
-    console.log("📊 [PAYMENTS-CUSTOMER] Status da resposta:", response.status)
-
-    if (!response.ok) {
-      let errorData: any = {}
-      try {
-        errorData = await response.json()
-      } catch (e) {
-        console.error("❌ [PAYMENTS-CUSTOMER] Resposta não é JSON válido")
-        errorData = { message: `Erro ${response.status}: ${response.statusText}` }
-      }
-      console.error("❌ [PAYMENTS-CUSTOMER] Erro da API Asaas:", errorData)
-      return NextResponse.json(
-        { error: errorData.errors?.[0]?.description || errorData.message || "Erro ao buscar pagamentos" },
-        { status: response.status }
-      )
-    }
-
-    const data = await response.json()
-    console.log("✅ [PAYMENTS-CUSTOMER] Pagamentos encontrados:", data.totalCount || 0)
-    
-    // Adicionar informações de debug nos logs
-    if (data.data && data.data.length > 0) {
-      console.log("📋 [PAYMENTS-CUSTOMER] Primeiros pagamentos:")
-      data.data.slice(0, 3).forEach((payment: any, index: number) => {
-        console.log(`   ${index + 1}. ${payment.id} - R$ ${payment.value} - ${payment.status} - ${payment.description}`)
+    try {
+      // Log para debug
+      console.log("🔍 [PAYMENTS-CUSTOMER] Tentando acessar API:", {
+        url: `${ASAAS_BASE_URL}/v3/payments?customer=${customerId}&limit=50&offset=0`,
+        customerId,
+        hasToken: !!ASAAS_API_KEY,
+        baseUrl: ASAAS_BASE_URL
       })
+
+      const response = await fetch(`${ASAAS_BASE_URL}/v3/payments?customer=${customerId}&limit=50&offset=0`, {
+        headers: {
+          access_token: ASAAS_API_KEY,
+          "Content-Type": "application/json"
+        },
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+      console.log("📊 [PAYMENTS-CUSTOMER] Status da resposta:", response.status)
+
+      if (!response.ok) {
+        let errorData: any = {}
+        try {
+          const responseText = await response.text()
+          console.log("📄 [PAYMENTS-CUSTOMER] Resposta de erro:", responseText)
+          errorData = JSON.parse(responseText)
+        } catch (e) {
+          console.error("❌ [PAYMENTS-CUSTOMER] Resposta não é JSON válido")
+          errorData = { message: `Erro ${response.status}: ${response.statusText}` }
+        }
+        
+        console.error("❌ [PAYMENTS-CUSTOMER] Erro da API Asaas:", errorData)
+        
+        if (response.status === 401) {
+          return NextResponse.json(
+            { error: "Token da API Asaas inválido ou expirado" },
+            { status: 401 }
+          )
+        } else if (response.status === 404) {
+          return NextResponse.json(
+            { error: "Customer não encontrado no Asaas. Verifique se o customer_id está correto ou se existe alguma cobrança criada para este cliente." },
+            { status: 404 }
+          )
+        } else {
+          return NextResponse.json(
+            { 
+              error: errorData.errors?.[0]?.description || errorData.message || "Erro ao buscar pagamentos",
+              status: response.status
+            },
+            { status: response.status }
+          )
+        }
+      }
+
+      const data = await response.json()
+      console.log("✅ [PAYMENTS-CUSTOMER] Pagamentos encontrados:", data.totalCount || 0)
+      
+      if (data.data && data.data.length > 0) {
+        console.log("📋 [PAYMENTS-CUSTOMER] Primeiros pagamentos:")
+        data.data.slice(0, 3).forEach((payment: any, index: number) => {
+          console.log(`   ${index + 1}. ${payment.id} - R$ ${payment.value} - ${payment.status} - ${payment.description}`)
+        })
+      }
+      
+      return NextResponse.json(data)
+
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.log("❌ [PAYMENTS-CUSTOMER] Timeout na requisição para API Asaas")
+        return NextResponse.json(
+          { error: "Timeout na requisição para API Asaas" },
+          { status: 408 }
+        )
+      }
+      
+      throw fetchError
     }
-    
-    return NextResponse.json(data)
 
   } catch (error: any) {
     console.error("❌ [PAYMENTS-CUSTOMER] Erro inesperado:", error)
     return NextResponse.json(
       { 
         error: "Erro interno do servidor",
-        details: error.message
+        details: error.message || "Erro desconhecido"
       },
       { status: 500 }
     )

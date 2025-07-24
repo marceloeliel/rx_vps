@@ -1,0 +1,13 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://rxnegocios.com.br/sitemap.xml
+
+# Disallow admin and test routes
+Disallow: /admin/
+Disallow: /teste-*/
+Disallow: /debug-*/
+Disallow: /api/
+Disallow: /_next/ 

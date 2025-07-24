@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-import { getAsaasCustomerId, saveAsaasCustomerId } from "@/lib/supabase/profiles"
+// import { getAsaasCustomerId, saveAsaasCustomerId } from "@/lib/supabase/profiles" // REMOVIDO - Sistema de pagamentos desabilitado
 import { useUserPayments } from "@/hooks/use-user-payments"
 import {
   User,
@@ -63,7 +63,8 @@ export default function TesteCustomerSystemPage() {
       
       if (user) {
         // Buscar customer_id existente
-        const existingCustomerId = await getAsaasCustomerId(user.id)
+        // const existingCustomerId = await getAsaasCustomerId(user.id) // REMOVIDO - Sistema de pagamentos desabilitado
+    const existingCustomerId = null // Temporário
         setAsaasCustomerId(existingCustomerId)
       }
     }
@@ -349,7 +350,7 @@ export default function TesteCustomerSystemPage() {
                       </div>
                       <Badge 
                         variant={
-                          payment.status === 'CONFIRMED' || payment.status === 'RECEIVED' ? 'default' :
+                          payment.status === 'CONFIRMED' || payment.status === 'RECEIVED' || payment.status === 'RECEIVED_IN_CASH' ? 'default' :
                           payment.status === 'PENDING' || payment.status === 'AWAITING_PAYMENT' ? 'secondary' :
                           'destructive'
                         }

@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,8 @@ import {
 } from "@/lib/supabase/veiculos"
 
 export default function VeiculosPage() {
+  const searchParams = useSearchParams()
+  const agenciaParam = searchParams.get('agencia')
   const [vehicles, setVehicles] = useState<Veiculo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -109,6 +112,7 @@ export default function VeiculosPage() {
         combustivel: selectedFuels.length > 0 ? selectedFuels[0] : undefined,
         cambio: selectedTransmissions.length > 0 ? selectedTransmissions[0] : undefined,
         estado: selectedStates.length > 0 ? selectedStates[0] : undefined,
+        agencia: agenciaParam || undefined,
         page: page,
         limit: itemsPerPage
       }
@@ -163,6 +167,7 @@ export default function VeiculosPage() {
     searchModel,
     priceRange,
     yearRange,
+    agenciaParam,
   ])
   
   // Função para carregar mais veículos (paginação)

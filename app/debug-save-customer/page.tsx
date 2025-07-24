@@ -184,6 +184,45 @@ export default function DebugSaveCustomerPage() {
     }
   }
 
+  // Teste 5: Testar API de pagamentos (NOVO)
+  const testPaymentsAPI = async () => {
+    if (!currentUser) return
+
+    setLoading(true)
+    try {
+      console.log("🧪 [TEST] Testando API de pagamentos...")
+      
+      // Primeiro buscar customer_id
+      const foundCustomerId = await getAsaasCustomerId(currentUser.id)
+      
+      if (!foundCustomerId) {
+        toast.error("Customer ID não encontrado. Execute o teste de API customers primeiro.")
+        return
+      }
+
+      console.log("🔍 [TEST] Buscando pagamentos para customer:", foundCustomerId)
+      
+      const response = await fetch(`/api/asaas/payments/customer/${foundCustomerId}`)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro na API")
+      }
+      
+      const paymentsData = await response.json()
+      console.log("✅ [TEST] Dados de pagamentos:", paymentsData)
+      
+      const totalPayments = paymentsData.totalCount || paymentsData.data?.length || 0
+      toast.success(`API funcionando! ${totalPayments} pagamento(s) encontrado(s)`)
+      
+    } catch (error: any) {
+      console.error("❌ [TEST] Erro na API de pagamentos:", error)
+      toast.error(`Erro: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <div className="mb-6">
@@ -262,6 +301,15 @@ export default function DebugSaveCustomerPage() {
               variant="outline"
             >
               4. Teste Buscar Customer ID
+            </Button>
+
+            <Button 
+              onClick={testPaymentsAPI}
+              disabled={loading || !currentUser}
+              className="w-full"
+              variant="outline"
+            >
+              5. Testar API de Pagamentos
             </Button>
 
             <Button 

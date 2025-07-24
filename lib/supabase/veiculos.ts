@@ -312,6 +312,7 @@ export async function getVeiculosPublicos(filters?: {
   combustivel?: string
   cambio?: string
   estado?: string
+  agencia?: string
   page?: number
   limit?: number
 }): Promise<{ data: Veiculo[] | null; error: any; count: number }> {
@@ -356,6 +357,9 @@ export async function getVeiculosPublicos(filters?: {
       }
       if (filters.estado) {
         query = query.eq("estado_veiculo", filters.estado)
+      }
+      if (filters.agencia) {
+        query = query.eq("user_id", filters.agencia)
       }
     }
 

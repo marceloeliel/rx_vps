@@ -6,13 +6,49 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { useAsaas } from "@/hooks/use-asaas"
+// import { useAsaas } from "@/hooks/use-asaas" // REMOVIDO - Sistema de pagamentos desabilitado
 import { CheckCircle, XCircle, AlertCircle } from "lucide-react"
 
 export default function TesteCpfPage() {
   const [cpf, setCpf] = useState("")
   const [resultado, setResultado] = useState<{ valido: boolean; mensagem: string } | null>(null)
-  const { validateCpfCnpj, formatCpfCnpj } = useAsaas()
+  // const { validateCpfCnpj, formatCpfCnpj } = useAsaas() // REMOVIDO - Sistema de pagamentos desabilitado
+
+  // Função simples de validação de CPF
+  const validateCpfCnpj = (cpf: string): boolean => {
+    const cleanCpf = cpf.replace(/\D/g, "")
+    
+    if (cleanCpf.length !== 11) return false
+    if (/^(\d)\1+$/.test(cleanCpf)) return false // Todos os dígitos iguais
+    
+    // Validação dos dígitos verificadores
+    let sum = 0
+    for (let i = 0; i < 9; i++) {
+      sum += parseInt(cleanCpf.charAt(i)) * (10 - i)
+    }
+    let remainder = 11 - (sum % 11)
+    let digit1 = remainder >= 10 ? 0 : remainder
+    
+    if (digit1 !== parseInt(cleanCpf.charAt(9))) return false
+    
+    sum = 0
+    for (let i = 0; i < 10; i++) {
+      sum += parseInt(cleanCpf.charAt(i)) * (11 - i)
+    }
+    remainder = 11 - (sum % 11)
+    let digit2 = remainder >= 10 ? 0 : remainder
+    
+    return digit2 === parseInt(cleanCpf.charAt(10))
+  }
+
+  // Função simples de formatação de CPF
+  const formatCpfCnpj = (cpf: string): string => {
+    const cleanCpf = cpf.replace(/\D/g, "")
+    if (cleanCpf.length === 11) {
+      return cleanCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+    }
+    return cpf
+  }
 
   // CPFs de teste conhecidos
   const cpfsValidos = [

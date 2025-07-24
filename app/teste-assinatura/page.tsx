@@ -1,6 +1,6 @@
 "use client"
 
-import { SubscriptionGuard } from "@/components/subscription-guard"
+import SubscriptionGuard from "@/components/subscription-guard"
 import { useSubscription } from "@/hooks/use-subscription"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"

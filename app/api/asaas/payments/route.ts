@@ -1,137 +1,115 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const ASAAS_API_URL = "https://api.asaas.com/v3"
-
-// Token hardcoded temporariamente - REMOVER EM PRODUÇÃO
-const ASAAS_API_KEY_HARDCODED = "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjhlZjU3ZGQ3LTA2NjctNDNjYi1hNjYwLTIyOGE3MGM5MTcxNTo6JGFhY2hfMDgxODBjMjQtZWE1YS00MGNlLTg0MjEtMzI0OTY3MGM5MzBj"
-
-const ASAAS_API_KEY = ASAAS_API_KEY_HARDCODED // Forçar uso do token hardcoded temporariamente
+// Configurações fixas para sandbox
+const ASAAS_API_KEY = "$aact_hmlg_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmI2M2RmYjNlLTgzMjMtNDlhYy04ZWM5LWQyODFhNzUyMDYwZTo6JGFhY2hfY2MyOTEzZDItMjZlMy00ZDQ0LWIzZTctZjdhYjEyNzc2MWIz"
+const ASAAS_BASE_URL = "https://api-sandbox.asaas.com"
 
 export async function POST(request: NextRequest) {
-  console.log("🚀 [PAYMENTS] Iniciando POST...")
-  
   try {
-    console.log("🔑 [PAYMENTS] Verificando token...")
+    const body = await request.json()
+    
+    console.log("🚀 [PAYMENTS-CREATE] Criando pagamento:", {
+      customer: body.customer,
+      value: body.value,
+      billingType: body.billingType
+    })
+
     if (!ASAAS_API_KEY) {
-      console.log("❌ [PAYMENTS] Token não encontrado")
+      console.error("❌ [PAYMENTS-CREATE] API Key não configurada")
       return NextResponse.json(
-        { error: "ASAAS_API_KEY não configurada" },
+        { error: "API Key não configurada" },
         { status: 500 }
       )
     }
-    console.log("✅ [PAYMENTS] Token encontrado")
 
-    console.log("📝 [PAYMENTS] Lendo dados do request...")
-    const paymentData = await request.json()
-    console.log("📝 [PAYMENTS] Dados recebidos:", paymentData)
-
-    console.log("🌐 [PAYMENTS] Fazendo requisição para Asaas...")
-    const response = await fetch(`${ASAAS_API_URL}/payments`, {
+    // Fazer requisição para o Asaas
+    const response = await fetch(`${ASAAS_BASE_URL}/v3/payments`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         "access_token": ASAAS_API_KEY,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(paymentData),
+      body: JSON.stringify(body),
     })
 
-    console.log("📊 [PAYMENTS] Status da resposta:", response.status)
-    const data = await response.json()
-    console.log("📊 [PAYMENTS] Dados da resposta:", data)
+    console.log("📊 [PAYMENTS-CREATE] Status da resposta:", response.status)
 
     if (!response.ok) {
-      console.error("❌ [PAYMENTS] Erro da API Asaas:", data)
+      const errorData = await response.json()
+      console.error("❌ [PAYMENTS-CREATE] Erro do Asaas:", errorData)
       return NextResponse.json(
-        { error: data.errors?.[0]?.description || "Erro ao criar pagamento" },
+        { error: "Erro ao criar pagamento no Asaas", details: errorData },
         { status: response.status }
       )
     }
 
-    // Se for pagamento PIX, buscar dados completos incluindo QR Code
-    if (paymentData.billingType === 'PIX' && data.id) {
-      console.log("🔍 [PAYMENTS] Buscando dados completos do PIX para:", data.id)
-      
-      try {
-        const pixResponse = await fetch(`${ASAAS_API_URL}/payments/${data.id}/pixQrCode`, {
-          headers: {
-            "access_token": ASAAS_API_KEY,
-          },
-        })
+    const paymentData = await response.json()
+    console.log("✅ [PAYMENTS-CREATE] Pagamento criado:", paymentData.id)
 
-        if (pixResponse.ok) {
-          const pixData = await pixResponse.json()
-          console.log("✅ [PAYMENTS] Dados PIX obtidos:", pixData)
-          
-          // Adicionar dados PIX ao response
-          data.pixTransaction = {
-            qrCode: {
-              payload: pixData.payload,
-              encodedImage: pixData.encodedImage
-            }
-          }
-        } else {
-          console.log("⚠️ [PAYMENTS] Não foi possível obter QR Code PIX")
-        }
-      } catch (pixError) {
-        console.error("❌ [PAYMENTS] Erro ao buscar dados PIX:", pixError)
-      }
-    }
-
-    console.log("✅ [PAYMENTS] Pagamento criado com sucesso:", data.id)
-    return NextResponse.json(data)
+    return NextResponse.json(paymentData)
 
   } catch (error: any) {
-    console.error("❌ [PAYMENTS] Erro inesperado:", error)
+    console.error("❌ [PAYMENTS-CREATE] Erro inesperado:", error)
     return NextResponse.json(
-      { error: "Erro interno do servidor" },
+      { error: "Erro interno do servidor", details: error.message },
       { status: 500 }
     )
   }
 }
 
 export async function GET(request: NextRequest) {
-  console.log("🚀 [PAYMENTS] Iniciando GET...")
-  
   try {
-    console.log("🔑 [PAYMENTS] Verificando token...")
-    if (!ASAAS_API_KEY) {
-      console.log("❌ [PAYMENTS] Token não encontrado")
-      return NextResponse.json(
-        { error: "ASAAS_API_KEY não configurada" },
-        { status: 500 }
-      )
-    }
-    console.log("✅ [PAYMENTS] Token encontrado")
-
     const { searchParams } = new URL(request.url)
     const limit = searchParams.get("limit") || "10"
     const offset = searchParams.get("offset") || "0"
+    const customer = searchParams.get("customer")
 
-    console.log("🌐 [PAYMENTS] Fazendo requisição GET para Asaas...")
-    const response = await fetch(`${ASAAS_API_URL}/payments?limit=${limit}&offset=${offset}`, {
+    console.log("🔍 [PAYMENTS-LIST] Listando pagamentos:", { limit, offset, customer })
+
+    if (!ASAAS_API_KEY) {
+      console.error("❌ [PAYMENTS-LIST] API Key não configurada")
+      return NextResponse.json(
+        { error: "API Key não configurada" },
+        { status: 500 }
+      )
+    }
+
+    // Montar URL com parâmetros
+    let url = `${ASAAS_BASE_URL}/v3/payments?limit=${limit}&offset=${offset}`
+    if (customer) {
+      url += `&customer=${customer}`
+    }
+
+    console.log("🌐 [PAYMENTS-LIST] Fazendo requisição:", url)
+
+    const response = await fetch(url, {
+      method: "GET",
       headers: {
         "access_token": ASAAS_API_KEY,
+        "Content-Type": "application/json",
       },
     })
 
-    console.log("📊 [PAYMENTS] Status da resposta:", response.status)
-    const data = await response.json()
+    console.log("📊 [PAYMENTS-LIST] Status da resposta:", response.status)
 
     if (!response.ok) {
-      console.error("❌ [PAYMENTS] Erro da API Asaas:", data)
+      const errorData = await response.json()
+      console.error("❌ [PAYMENTS-LIST] Erro do Asaas:", errorData)
       return NextResponse.json(
-        { error: data.errors?.[0]?.description || "Erro ao buscar pagamentos" },
+        { error: "Erro ao listar pagamentos no Asaas", details: errorData },
         { status: response.status }
       )
     }
 
-    console.log("✅ [PAYMENTS] Pagamentos listados com sucesso")
+    const data = await response.json()
+    console.log("✅ [PAYMENTS-LIST] Pagamentos encontrados:", data.totalCount || data.data?.length || 0)
+
     return NextResponse.json(data)
 
   } catch (error: any) {
-    console.error("❌ [PAYMENTS] Erro inesperado:", error)
+    console.error("❌ [PAYMENTS-LIST] Erro inesperado:", error)
     return NextResponse.json(
-      { error: "Erro interno do servidor" },
+      { error: "Erro interno do servidor", details: error.message },
       { status: 500 }
     )
   }

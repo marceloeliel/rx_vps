@@ -1,10 +1,7 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 /node_modules
 /.pnp
 .pnp.js
-.yarn/install-state.gz
 
 # testing
 /coverage
@@ -24,11 +21,13 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
 # local env files
 .env*.local
-.env.production
+.env
 .env.development
+.env.production
 
 # vercel
 .vercel
@@ -40,28 +39,16 @@ next-env.d.ts
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# OS
-Thumbs.db
 
 # Logs
 logs
 *.log
 
-# Temporary files
-tmp/
+# Temp files
+*.temp
+*.tmp
+temp_*
 temp/
 
-# Archive files
-*.zip
-*.tar.gz
-
-# Deploy scripts (com dados sensíveis)
-deploy-ubuntu-secure.sh
-deploy-app.sh
-
-# Backups
-backups/
-*.backup
+# System Files
+Thumbs.db

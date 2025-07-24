@@ -93,16 +93,92 @@ export function UserPaymentsDashboard() {
       setCurrentUser(user)
       console.log("✅ [DASHBOARD] Usuário carregado:", user.id)
 
-      // 2. Buscar asaas_customer_id do usuário
-      console.log("🔍 [DASHBOARD] Buscando customer_id...")
+      // 2. Buscar dados do perfil do usuário
+      console.log("🔍 [DASHBOARD] Buscando dados do perfil...")
       const { data: profile } = await supabase
         .from("profiles")
-        .select("asaas_customer_id")
+        .select("asaas_customer_id, cpf, documento, nome_completo, whatsapp")
         .eq("id", user.id)
         .single()
 
       if (!profile?.asaas_customer_id) {
-        console.log("ℹ️ [DASHBOARD] Customer_id não encontrado, usuário sem pagamentos")
+        console.log("ℹ️ [DASHBOARD] Customer_id não encontrado no Supabase, buscando no Asaas...")
+        
+        // Tentar buscar customer existente no Asaas pelo email/CPF
+        try {
+          // Primeiro, verificar se o usuário tem CPF/documento no perfil
+          const userCpf = profile?.cpf || profile?.documento
+          
+          if (userCpf) {
+            console.log("🔍 [DASHBOARD] Buscando customer no Asaas por CPF:", userCpf)
+            
+            // Buscar customer existente no Asaas por CPF
+            const searchResponse = await fetch(`/api/asaas/customers?cpfCnpj=${userCpf}`)
+            
+            if (searchResponse.ok) {
+              const searchData = await searchResponse.json()
+              
+              if (searchData.data && searchData.data.length > 0) {
+                const existingCustomer = searchData.data[0]
+                console.log("✅ [DASHBOARD] Customer encontrado no Asaas:", existingCustomer.id)
+                
+                // Salvar customer_id no Supabase
+                const { error: updateError } = await supabase
+                  .from("profiles")
+                  .update({ 
+                    asaas_customer_id: existingCustomer.id,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq("id", user.id)
+
+                if (!updateError) {
+                  console.log("✅ [DASHBOARD] Customer_id salvo no Supabase")
+                  toast.success("Sistema de pagamentos conectado! Carregando suas cobranças...")
+                  
+                  // Agora buscar pagamentos
+                  await loadPayments(existingCustomer.id)
+                  return
+                } else {
+                  console.error("❌ [DASHBOARD] Erro ao salvar customer_id:", updateError)
+                }
+              } else {
+                console.log("ℹ️ [DASHBOARD] Customer não encontrado no Asaas por CPF")
+              }
+            }
+          }
+          
+          // Se não encontrou por CPF, tentar criar novo customer
+          console.log("🆕 [DASHBOARD] Tentando criar novo customer...")
+          const createResponse = await fetch("/api/asaas/customers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.id,
+              name: profile?.nome_completo || user.user_metadata?.full_name || user.email?.split('@')[0] || "Cliente",
+              email: user.email,
+              cpfCnpj: userCpf || "11144477735", // Usar CPF do perfil ou padrão para sandbox
+              phone: profile?.whatsapp || "61999999999",
+              mobilePhone: profile?.whatsapp || "61999999999",
+            }),
+          })
+
+          if (createResponse.ok) {
+            const customerData = await createResponse.json()
+            console.log("✅ [DASHBOARD] Customer criado automaticamente:", customerData.id)
+            toast.success("Sistema de pagamentos configurado! Carregando suas cobranças...")
+            
+            // Agora buscar pagamentos com o novo customer_id
+            await loadPayments(customerData.id)
+            return
+          } else {
+            console.log("⚠️ [DASHBOARD] Falha ao criar customer automaticamente")
+          }
+        } catch (error) {
+          console.error("❌ [DASHBOARD] Erro ao buscar/criar customer:", error)
+        }
+        
+        // Se não conseguiu nem buscar nem criar
+        setError("Não foi possível conectar ao sistema de pagamentos. Verifique se você possui cobranças cadastradas ou faça uma nova compra.")
         setPayments([])
         return
       }
@@ -127,10 +203,11 @@ export function UserPaymentsDashboard() {
     try {
       console.log("💳 [DASHBOARD] Buscando pagamentos para customer:", customerId)
       
-      const response = await fetch(`/api/asaas/payments/user/${customerId}`)
+      const response = await fetch(`/api/asaas/payments/customer/${customerId}`)
       
       if (!response.ok) {
-        throw new Error("Erro ao buscar pagamentos")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Erro ao buscar pagamentos")
       }
 
       const paymentsData = await response.json()
@@ -163,6 +240,7 @@ export function UserPaymentsDashboard() {
       switch (payment.status) {
         case "RECEIVED":
         case "CONFIRMED":
+        case "RECEIVED_IN_CASH":
           acc.pagos++
           acc.valor_pago += value
           break
@@ -202,6 +280,7 @@ export function UserPaymentsDashboard() {
     switch (status) {
       case "RECEIVED":
       case "CONFIRMED":
+      case "RECEIVED_IN_CASH":
         return {
           label: "Pago",
           color: "bg-green-100 text-green-800",

@@ -29,36 +29,53 @@ export async function uploadProfilePhoto(userId: string, file: File): Promise<Up
       }
     }
 
+    // Redimensionar imagem antes do upload
+    const resizedFile = await resizeProfileImage(file)
+
     // Gerar nome único para o arquivo
     const fileExtension = file.name.split(".").pop()?.toLowerCase()
     const fileName = `${userId}/profile-${Date.now()}.${fileExtension}`
 
-    // Fazer upload do arquivo
-    const { data, error } = await supabase.storage.from("perfil").upload(fileName, file, {
-      cacheControl: "3600",
-      upsert: true,
-    })
+    // Fazer upload do arquivo como base64 se o storage falhar
+    try {
+      // Tentar fazer upload para o storage
+      const { data, error } = await supabase.storage.from("perfil").upload(fileName, resizedFile, {
+        cacheControl: "3600",
+        upsert: true,
+      })
 
-    if (error) {
-      console.error("Erro no upload:", error)
-      return {
-        success: false,
-        error: `Erro no upload: ${error.message}`,
+      if (error) {
+        throw error
       }
-    }
 
-    // Obter URL pública
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("perfil").getPublicUrl(fileName)
+      // Obter URL pública
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("perfil").getPublicUrl(fileName)
 
-    return {
-      success: true,
-      url: publicUrl,
-      path: fileName,
+      return {
+        success: true,
+        url: publicUrl,
+        path: fileName,
+      }
+    } catch (storageError) {
+      console.log("⚠️ [PROFILE-STORAGE] Erro no storage, usando base64:", storageError)
+
+      // Converter para base64 como fallback
+      return new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          resolve({
+            success: true,
+            url: reader.result as string,
+            path: fileName,
+          })
+        }
+        reader.readAsDataURL(resizedFile)
+      })
     }
   } catch (error) {
-    console.error("Erro inesperado no upload:", error)
+    console.error("❌ [PROFILE-STORAGE] Erro inesperado no upload:", error)
     return {
       success: false,
       error: "Erro inesperado durante o upload",
@@ -71,33 +88,38 @@ export async function deleteProfilePhoto(userId: string, photoUrl: string): Prom
   const supabase = createClient()
 
   try {
+    // Se for uma URL base64, não precisa deletar do storage
+    if (photoUrl.startsWith('data:')) {
+      return true
+    }
+
     // Extrair path da URL
     const path = extractStoragePathFromUrl(photoUrl)
     if (!path) {
-      console.log("⚠️ Não foi possível extrair path da URL:", photoUrl)
+      console.log("⚠️ [PROFILE-STORAGE] Não foi possível extrair path da URL:", photoUrl)
       return false
     }
 
-    console.log("🗑️ Tentando deletar arquivo:", path)
+    console.log("🗑️ [PROFILE-STORAGE] Tentando deletar arquivo:", path)
 
     // Verificar se o path pertence ao usuário
     if (!path.startsWith(`${userId}/`)) {
-      console.error("❌ Tentativa de deletar arquivo de outro usuário:", path)
+      console.error("❌ [PROFILE-STORAGE] Tentativa de deletar arquivo de outro usuário:", path)
       return false
     }
 
     const { error } = await supabase.storage.from("perfil").remove([path])
 
     if (error) {
-      console.error("❌ Erro ao deletar foto:", error)
+      console.error("❌ [PROFILE-STORAGE] Erro ao deletar foto:", error)
       // Mesmo com erro, retornamos true para não bloquear o upload da nova foto
       return true
     }
 
-    console.log("✅ Foto deletada com sucesso:", path)
+    console.log("✅ [PROFILE-STORAGE] Foto deletada com sucesso:", path)
     return true
   } catch (error) {
-    console.error("❌ Erro inesperado ao deletar foto:", error)
+    console.error("❌ [PROFILE-STORAGE] Erro inesperado ao deletar foto:", error)
     // Mesmo com erro, retornamos true para não bloquear o upload da nova foto
     return true
   }
@@ -118,7 +140,7 @@ function extractStoragePathFromUrl(url: string): string | null {
   }
 }
 
-// Função para redimensionar imagem (opcional)
+// Função para redimensionar imagem
 export function resizeProfileImage(file: File, maxSize = 300): Promise<File> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement("canvas")

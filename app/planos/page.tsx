@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowLeft, Check, QrCode, Copy, Loader2, CreditCard, FileText, X, AlertCircle } from "lucide-react"
+import { ArrowLeft, Check, QrCode, Copy, Loader2, CreditCard, FileText, X, AlertCircle, Clock } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useAsaas } from "@/hooks/use-asaas"
+import { useAsaasV2 } from "@/hooks/use-asaas-v2"
 import Image from "next/image"
 
 interface Plan {
@@ -30,10 +30,13 @@ interface PixPaymentData {
   value: number
   status: string
   dueDate: string
-  pixTransaction: {
-    qrCode: {
-      payload: string
-      encodedImage: string
+  qrCode?: string
+  copyAndPaste?: string
+  expirationDate?: string
+  pixTransaction?: {
+    qrCode?: {
+      payload?: string
+      encodedImage?: string
     }
   }
 }
@@ -42,7 +45,7 @@ const plans: Plan[] = [
   {
     id: "basico",
     name: "Básico",
-    price: 49.9,
+    price: 59.9,
     features: ["Até 5 veículos", "Anúncios básicos", "Suporte por email", "Estatísticas básicas"],
     buttonText: "Assinar Agora",
     buttonVariant: "default",
@@ -50,15 +53,16 @@ const plans: Plan[] = [
   {
     id: "profissional",
     name: "Profissional",
-    price: 99.9,
+    price: 299.0,
     popular: true,
     features: [
-      "Até 20 veículos",
+      "Até 30 veículos",
       "Anúncios destacados",
       "Suporte prioritário",
       "Estatísticas avançadas",
       "Relatórios personalizados",
-      "API de integração",
+      "3 destaques de veículos",
+      "Painel administrativo"
     ],
     buttonText: "Assinar Agora",
     buttonVariant: "destructive",
@@ -66,16 +70,33 @@ const plans: Plan[] = [
   {
     id: "empresarial",
     name: "Empresarial",
-    price: 199.9,
+    price: 897.9,
     features: [
-      "Veículos ilimitados",
+      "Até 400 veículos",
       "Anúncios premium",
       "Suporte 24/7",
       "Estatísticas completas",
       "Relatórios avançados",
-      "API de integração",
+      "40 destaques de veículos",
+      "Painel administrativo"
+    ],
+    buttonText: "Assinar Agora",
+    buttonVariant: "outline",
+  },
+  {
+    id: "ilimitado",
+    name: "Ilimitado",
+    price: 1897.9,
+    features: [
+      "Veículos ilimitados",
+      "Anúncios premium",
+      "Suporte 24/7 prioritário",
+      "Estatísticas completas",
+      "Relatórios avançados",
+      "100 destaques de veículos",
       "Painel administrativo",
-      "Múltiplos usuários",
+      "Acesso API exclusivo",
+      "Consultoria dedicada"
     ],
     buttonText: "Assinar Agora",
     buttonVariant: "outline",
@@ -85,7 +106,15 @@ const plans: Plan[] = [
 export default function PlanosPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { createCustomer, createPixPayment, loading } = useAsaas()
+  const { 
+    createCustomerAndPixPayment, 
+    getPaymentStatus,
+    copyPixCode, 
+    formatCurrency, 
+    formatDate,
+    loading,
+    error 
+  } = useAsaasV2()
   
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -98,6 +127,9 @@ export default function PlanosPage() {
   const [paymentConfirmed, setPaymentConfirmed] = useState(false)
   const [hasPendingPayments, setHasPendingPayments] = useState(false)
   const [checkingPendingPayments, setCheckingPendingPayments] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(300) // 5 minutos em segundos
+  const [timerActive, setTimerActive] = useState(false)
+  const [errorCount, setErrorCount] = useState(0) // Contador de erros consecutivos
   
   // Dados do formulário para PIX
   const [formData, setFormData] = useState({
@@ -126,6 +158,12 @@ export default function PlanosPage() {
       currency: "BRL",
       minimumFractionDigits: 2,
     }).format(price)
+  }
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
   useEffect(() => {
@@ -300,36 +338,110 @@ export default function PlanosPage() {
         userId: currentUser.id,
       }
 
-      const { data: customer, error: customerError } = await createCustomer(customerData)
+      // Preparar dados do customer
+      const asaasCustomerData = {
+        name: formData.nomeCompleto,
+        email: formData.email,
+        cpfCnpj: formData.cpf.replace(/\D/g, ""),
+        mobilePhone: formData.telefone.replace(/\D/g, ""),
+      }
+
+      // Preparar dados do pagamento
+      const paymentData = {
+        value: plan.price,
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias
+        description: `${plan.name} - Pagamento mensal`,
+        externalReference: `plan_${plan.id}_${Date.now()}`,
+      }
+
+      console.log("🚀 [PIX] Iniciando criação do customer e pagamento...")
+
+      // Criar customer e pagamento PIX
+      const { customer, payment } = await createCustomerAndPixPayment(asaasCustomerData, paymentData)
       
-      if (customerError || !customer) {
-        throw new Error(customerError || "Erro ao criar cliente")
+      if (!customer || !payment) {
+        throw new Error(error || "Sistema de pagamentos em manutenção. Tente novamente em breve.")
       }
 
-      // 2. Criar pagamento PIX
-      const { data: payment, error: paymentError } = await createPixPayment(
-        customer.id,
-        plan.price,
-        `${plan.name} - Pagamento mensal`
-      )
+      console.log("✅ [PIX] Customer criado:", customer.id)
+      console.log("✅ [PIX] Pagamento PIX criado:", payment.id)
+      console.log("🔍 [PIX] PIX Transaction:", payment.pixTransaction)
 
-      if (paymentError || !payment) {
-        throw new Error(paymentError || "Erro ao criar pagamento PIX")
-      }
-
-      console.log("🔍 [PIX] Dados completos do pagamento:", payment)
-      console.log("🔍 [PIX] Verificando pixTransaction:", payment.pixTransaction)
-
-      if (payment.pixTransaction) {
-        setPixPaymentData(payment)
+      if (payment.pixTransaction?.qrCode?.payload && payment.pixTransaction?.qrCode?.encodedImage) {
+        // Converter para o tipo esperado pelo modal
+        const pixData: PixPaymentData = {
+          id: payment.id!,
+          value: payment.value!,
+          status: payment.status!,
+          dueDate: payment.dueDate!,
+          pixTransaction: {
+            qrCode: {
+              payload: payment.pixTransaction.qrCode.payload,
+              encodedImage: payment.pixTransaction.qrCode.encodedImage
+            }
+          }
+        }
+        
+        setPixPaymentData(pixData)
         setShowPixModal(true)
         toast({
           title: "PIX gerado com sucesso!",
           description: "Escaneie o QR Code ou copie o código para pagar",
         })
       } else {
-        console.error("❌ [PIX] pixTransaction não encontrado no response:", payment)
-        throw new Error("Dados PIX não foram gerados")
+                      console.log("⚠️ [PIX] QR Code não disponível imediatamente, criando experiência integrada...")
+              
+              // Criar dados do PIX mesmo sem QR Code inicial
+              const pixData: PixPaymentData = {
+                id: payment.id!,
+                value: payment.value!,
+                status: payment.status!,
+                dueDate: payment.dueDate!,
+                pixTransaction: payment.pixTransaction || undefined
+              }
+              
+              setPixPaymentData(pixData)
+              setShowPixModal(true)
+              
+              toast({
+                title: "Processando PIX...",
+                description: "Gerando seu código PIX, aguarde um momento...",
+              })
+              
+              // Tentar buscar o PIX novamente em background
+              setTimeout(async () => {
+                try {
+                  const pixCheck = await getPaymentStatus(payment.id!)
+                  
+                  if (pixCheck?.pixTransaction?.qrCode?.payload && pixCheck?.pixTransaction?.qrCode?.encodedImage) {
+                    const updatedPixData: PixPaymentData = {
+                      id: pixCheck.id!,
+                      value: pixCheck.value!,
+                      status: pixCheck.status!,
+                      dueDate: pixCheck.dueDate!,
+                      pixTransaction: {
+                        qrCode: {
+                          payload: pixCheck.pixTransaction.qrCode.payload,
+                          encodedImage: pixCheck.pixTransaction.qrCode.encodedImage
+                        }
+                      }
+                    }
+                    
+                    setPixPaymentData(updatedPixData)
+                    toast({
+                      title: "🎉 PIX gerado!",
+                      description: "Seu código PIX está pronto para pagamento",
+                    })
+                    
+                    // Pequena vibração/feedback para mobile (se disponível)
+                    if (navigator.vibrate) {
+                      navigator.vibrate(200)
+                    }
+                  }
+                } catch (retryError) {
+                  console.error("Erro ao verificar PIX novamente:", retryError)
+                }
+              }, 3000)
       }
 
     } catch (error: any) {
@@ -359,13 +471,59 @@ export default function PlanosPage() {
     router.push(`/checkout?plano=${planId}`)
   }
 
-  const copyPixCode = () => {
-    if (pixPaymentData?.pixTransaction?.qrCode?.payload) {
-      navigator.clipboard.writeText(pixPaymentData.pixTransaction.qrCode.payload)
-      toast({
-        title: "Código copiado!",
-        description: "Cole no seu app do banco para pagar",
-      })
+  const handleCopyPixCode = async () => {
+    const pixCode = pixPaymentData?.copyAndPaste || pixPaymentData?.pixTransaction?.qrCode?.payload
+    if (pixCode) {
+      const success = await copyPixCode(pixCode)
+      if (success) {
+        toast({
+          title: "Código copiado!",
+          description: "Cole no seu app do banco para pagar",
+        })
+      } else {
+        toast({
+          title: "Erro ao copiar",
+          description: "Tente novamente",
+          variant: "destructive"
+        })
+      }
+    }
+  }
+
+  // Função para buscar informações de cobrança
+  const fetchBillingInfo = async (paymentId: string) => {
+    try {
+      console.log("🔍 [BILLING_INFO] Buscando informações de cobrança:", paymentId)
+      const response = await fetch(`/api/asaas-v2/payments/${paymentId}/billingInfo`)
+      
+      if (response.ok) {
+        const result = await response.json()
+        const billingData = result.data
+        
+        console.log("📱 [BILLING_INFO] Dados de cobrança recebidos:", {
+          hasPixData: !!billingData?.pixData,
+          hasQrCode: !!billingData?.pixData?.qrCode,
+          hasPayload: !!billingData?.pixData?.copyAndPaste
+        })
+
+        // Se temos dados do PIX, atualizar estado
+        if (billingData?.pixData) {
+          setPixPaymentData(prev => ({
+            ...prev!,
+            qrCode: billingData.pixData.qrCode || prev?.qrCode || '',
+            copyAndPaste: billingData.pixData.copyAndPaste || prev?.copyAndPaste || '',
+            expirationDate: billingData.pixData.expirationDate || prev?.expirationDate
+          }))
+          return true
+        }
+      } else {
+        console.log("⚠️ [BILLING_INFO] Erro ao buscar billing info, tentando método alternativo")
+      }
+      
+      return false
+    } catch (error) {
+      console.error("❌ [BILLING_INFO] Erro ao buscar billing info:", error)
+      return false
     }
   }
 
@@ -375,21 +533,30 @@ export default function PlanosPage() {
       setCheckingPayment(true)
       
       console.log("🔍 [CHECK_PAYMENT] Consultando pagamento:", paymentId)
-      const response = await fetch(`/api/asaas/payments/${paymentId}`)
+      const response = await fetch(`/api/asaas-v2/payments/${paymentId}`)
       
       console.log("📡 [CHECK_PAYMENT] Response status:", response.status)
       
       if (response.ok) {
-        const paymentData = await response.json()
+        const result = await response.json()
+        const paymentData = result.data || result // Suportar ambos os formatos
+        
         console.log("📋 [CHECK_PAYMENT] Dados completos do pagamento:", {
           id: paymentData.id,
           status: paymentData.status,
           value: paymentData.value,
           billingType: paymentData.billingType,
-          dateCreated: paymentData.dateCreated,
-          paymentDate: paymentData.paymentDate,
-          confirmedDate: paymentData.confirmedDate
+          hasPixData: !!paymentData.pixData
         })
+
+        // Se ainda não temos QR code, tentar buscar via billingInfo
+        if (!pixPaymentData?.qrCode || !pixPaymentData?.copyAndPaste) {
+          try {
+            await fetchBillingInfo(paymentId)
+          } catch (billingError) {
+            console.log("⚠️ [CHECK_PAYMENT] Erro ao buscar billing info, continuando sem QR code")
+          }
+        }
         
         // Verificar se o pagamento foi confirmado
         // ASAAS pode usar diferentes status dependendo do ambiente
@@ -411,8 +578,8 @@ export default function PlanosPage() {
             setShowPixModal(false)
             setPaymentConfirmed(false)
             setPixPaymentData(null)
-            // Redirecionar para perfil
-            router.push("/perfil")
+            // Redirecionar para painel da agência
+            router.push("/painel-agencia")
           }, 3000)
           
           return true
@@ -420,13 +587,29 @@ export default function PlanosPage() {
           console.log("⏳ [CHECK_PAYMENT] Pagamento ainda pendente. Status:", paymentData.status)
         }
       } else {
-        const errorData = await response.json().catch(() => ({ error: "Erro desconhecido" }))
-        console.error("❌ [CHECK_PAYMENT] Erro na API:", response.status, errorData)
+        try {
+          const errorData = await response.json()
+          console.error("❌ [CHECK_PAYMENT] Erro na API:", {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData.error,
+            details: errorData.details
+          })
+        } catch (jsonError) {
+          console.error("❌ [CHECK_PAYMENT] Erro na API (resposta não-JSON):", {
+            status: response.status,
+            statusText: response.statusText
+          })
+        }
       }
       
       return false
-    } catch (error) {
-      console.error("❌ [CHECK_PAYMENT] Erro inesperado ao verificar status:", error)
+    } catch (error: any) {
+      console.error("❌ [CHECK_PAYMENT] Erro inesperado ao verificar status:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
       return false
     } finally {
       setCheckingPayment(false)
@@ -440,11 +623,26 @@ export default function PlanosPage() {
     if (showPixModal && pixPaymentData && !paymentConfirmed) {
       console.log("🔄 [POLLING] Iniciando verificação de status para:", pixPaymentData.id)
       
-      // Verificar a cada 5 segundos
+      // Buscar informações de cobrança imediatamente
+      fetchBillingInfo(pixPaymentData.id)
+      
+      // Verificar a cada 5 segundos (mas parar se muitos erros)
       intervalId = setInterval(async () => {
-        const confirmed = await checkPaymentStatus(pixPaymentData.id)
-        if (confirmed && intervalId) {
-          clearInterval(intervalId)
+        // Se muitos erros consecutivos, pausar polling
+        if (errorCount >= 3) {
+          console.log("⚠️ [POLLING] Muitos erros consecutivos, pausando verificação automática")
+          return
+        }
+        
+        try {
+          const confirmed = await checkPaymentStatus(pixPaymentData.id)
+          setErrorCount(0) // Reset contador se sucesso
+          if (confirmed && intervalId) {
+            clearInterval(intervalId)
+          }
+        } catch (error) {
+          setErrorCount(prev => prev + 1)
+          console.log(`⚠️ [POLLING] Erro ${errorCount + 1}/3 na verificação`)
         }
       }, 5000)
       
@@ -457,6 +655,45 @@ export default function PlanosPage() {
         console.log("🛑 [POLLING] Parando verificação de status")
         clearInterval(intervalId)
       }
+    }
+  }, [showPixModal, pixPaymentData, paymentConfirmed])
+
+  // Timer de 5 minutos para o PIX
+  useEffect(() => {
+    let timerInterval: NodeJS.Timeout | null = null
+    
+    if (timerActive && timeLeft > 0) {
+      timerInterval = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            setTimerActive(false)
+            toast({
+              variant: "destructive",
+              title: "Tempo esgotado",
+              description: "O tempo para pagamento PIX expirou. Gere uma nova cobrança.",
+            })
+            setShowPixModal(false)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    
+    return () => {
+      if (timerInterval) {
+        clearInterval(timerInterval)
+      }
+    }
+  }, [timerActive, timeLeft])
+
+  // Iniciar timer quando modal PIX abrir
+  useEffect(() => {
+    if (showPixModal && pixPaymentData && !paymentConfirmed) {
+      setTimeLeft(300) // Reset para 5 minutos
+      setTimerActive(true)
+    } else {
+      setTimerActive(false)
     }
   }, [showPixModal, pixPaymentData, paymentConfirmed])
 
@@ -508,7 +745,7 @@ export default function PlanosPage() {
         setShowPixModal(false)
         setPaymentConfirmed(false)
         setPixPaymentData(null)
-        router.push("/perfil")
+        router.push("/painel-agencia")
       }, 3000)
     } finally {
       setCheckingPayment(false)
@@ -572,7 +809,7 @@ export default function PlanosPage() {
           </div>
 
           {/* Plans Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 max-w-7xl mx-auto">
             {plans.map((plan) => (
               <Card key={plan.id} className={`relative ${plan.popular ? "ring-2 ring-orange-500 shadow-lg" : ""}`}>
                 {plan.popular && (
@@ -715,7 +952,7 @@ export default function PlanosPage() {
                  <Input
                    id="telefone"
                    type="text"
-                   placeholder={loadingUserData ? "Carregando..." : "(11) 99999-9999"}
+                                           placeholder={loadingUserData ? "Carregando..." : "(73) 99999-9999"}
                    value={formData.telefone}
                    onChange={(e) => handleInputChange("telefone", e.target.value)}
                    maxLength={15}
@@ -778,7 +1015,7 @@ export default function PlanosPage() {
 
       {/* Modal do PIX */}
       <Dialog open={showPixModal} onOpenChange={setShowPixModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {paymentConfirmed ? (
@@ -806,7 +1043,7 @@ export default function PlanosPage() {
                 Pagamento Processado com Sucesso!
               </h3>
               <p className="text-gray-600 mb-4">
-                Seu plano foi ativado. Redirecionando para seu perfil...
+                Seu plano foi ativado. Redirecionando para o painel da agência...
               </p>
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -815,90 +1052,141 @@ export default function PlanosPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="text-center">
-                <p className="text-gray-600 mb-4">
-                  Escaneie o QR Code ou copie o código PIX para pagar
+              {/* Header com logo/identidade */}
+              <div className="text-center border-b pb-4">
+                <div className="text-blue-600 font-bold text-lg mb-2">RX Veículos</div>
+                <p className="text-gray-600 text-sm">
+                  Finalize seu pagamento de forma segura
                 </p>
-                
-                {/* QR Code */}
-                {pixPaymentData?.pixTransaction?.qrCode?.encodedImage && (
-                  <div className="bg-white p-4 rounded-lg border mb-4 inline-block">
-                    <Image
-                      src={`data:image/png;base64,${pixPaymentData.pixTransaction.qrCode.encodedImage}`}
-                      alt="QR Code PIX"
-                      width={200}
-                      height={200}
-                      className="mx-auto"
-                    />
-                  </div>
-                )}
-                
-                {/* Código PIX */}
-                {pixPaymentData?.pixTransaction?.qrCode?.payload && (
-                  <div className="bg-gray-50 p-3 rounded-lg border">
-                    <Label className="text-sm font-medium">Código PIX:</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Input
-                        value={pixPaymentData.pixTransaction.qrCode.payload}
-                        readOnly
-                        className="text-xs font-mono"
-                      />
-                      <Button
-                        size="sm"
-                        onClick={copyPixCode}
-                        className="flex-shrink-0"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Valor */}
-                {pixPaymentData && (
-                  <div className="text-center mt-4">
-                    <p className="text-sm text-gray-600">Valor a pagar:</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {formatPrice(pixPaymentData.value || 0)}
-                    </p>
-                  </div>
-                )}
-                
-                {/* Status de verificação */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-                  <div className="flex items-center gap-2 justify-center">
-                    {checkingPayment ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                        <span className="text-sm text-blue-700">Verificando pagamento...</span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-                        <span className="text-sm text-blue-700">Aguardando pagamento</span>
-                      </>
-                    )}
-                  </div>
-                  <p className="text-xs text-blue-600 text-center mt-1">
-                    O pagamento será confirmado automaticamente
-                  </p>
-                </div>
+              </div>
 
-                {/* Botão de teste para simular pagamento confirmado (apenas em desenvolvimento) */}
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
-                    <p className="text-xs text-yellow-700 text-center mb-2">
-                      🧪 Modo de desenvolvimento - Teste
+              {/* Valor destacado */}
+              {pixPaymentData && (
+                <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-4 text-center">
+                  <p className="text-sm text-gray-600 mb-1">Valor a pagar</p>
+                  <p className="text-3xl font-bold text-blue-600">
+                    {formatPrice(pixPaymentData.value || 0)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Pagamento PIX</p>
+                </div>
+              )}
+
+              {/* QR Code ou Loading */}
+              <div className="text-center">
+                {pixPaymentData?.qrCode || pixPaymentData?.pixTransaction?.qrCode?.encodedImage ? (
+                  <div className="space-y-3 animate-in fade-in-50 duration-500">
+                    <div className="bg-white p-6 rounded-xl border-2 border-blue-100 inline-block shadow-lg hover:shadow-xl transition-shadow duration-300">
+                      <Image
+                        src={`data:image/png;base64,${pixPaymentData.qrCode || pixPaymentData.pixTransaction?.qrCode?.encodedImage}`}
+                        alt="QR Code PIX"
+                        width={220}
+                        height={220}
+                        className="mx-auto transition-transform hover:scale-105 duration-300"
+                      />
+                    </div>
+                    <p className="text-sm text-gray-600 font-medium">
+                      📱 Escaneie o QR Code com seu banco
                     </p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-8 rounded-xl border-2 border-dashed border-gray-300">
+                    <Loader2 className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-3" />
+                    <p className="text-sm text-gray-600">Gerando QR Code PIX...</p>
+                    <p className="text-xs text-gray-500 mt-1">Aguarde alguns segundos</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Código PIX */}
+              {(pixPaymentData?.copyAndPaste || pixPaymentData?.pixTransaction?.qrCode?.payload) && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Ou copie o código PIX:
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={pixPaymentData.copyAndPaste || pixPaymentData.pixTransaction?.qrCode?.payload || ''}
+                      readOnly
+                      className="text-xs font-mono bg-gray-50 border-gray-300"
+                    />
                     <Button
-                      onClick={simulatePaymentConfirmed}
-                      variant="outline"
                       size="sm"
-                      className="w-full text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+                      onClick={handleCopyPixCode}
+                      className="flex-shrink-0 bg-blue-600 hover:bg-blue-700"
                     >
-                      Simular Pagamento Confirmado
+                      <Copy className="h-4 w-4" />
                     </Button>
                   </div>
+                  <p className="text-xs text-gray-500">
+                    Cole este código no seu aplicativo do banco
+                  </p>
+                </div>
+              )}
+
+              {/* Timer do PIX */}
+              <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 justify-center mb-2">
+                  <Clock className="h-5 w-5 text-orange-500" />
+                  <span className="text-lg font-bold text-orange-700">
+                    {formatTime(timeLeft)}
+                  </span>
+                </div>
+                <p className="text-center text-sm text-orange-600">
+                  {timeLeft <= 60 ? "⚠️ PIX expira em breve!" : "Tempo restante para pagamento"}
+                </p>
+              </div>
+
+              {/* Status de verificação */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-3 justify-center mb-2">
+                  {checkingPayment ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                      <span className="text-sm font-medium text-blue-700">Verificando pagamento...</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="h-3 w-3 bg-blue-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-medium text-blue-700">Aguardando pagamento</span>
+                    </>
+                  )}
+                </div>
+                <p className="text-xs text-blue-600 text-center">
+                  Assim que você pagar, será redirecionado automaticamente
+                </p>
+              </div>
+
+              {/* Instruções */}
+              <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
+                <h4 className="font-medium text-gray-800 mb-2">Como pagar:</h4>
+                <ul className="space-y-1 text-xs">
+                  <li>• Abra o app do seu banco</li>
+                  <li>• Escolha a opção PIX</li>
+                  <li>• Escaneie o QR Code ou cole o código</li>
+                  <li>• Confirme o pagamento</li>
+                </ul>
+              </div>
+
+              {/* Botões de ação */}
+              <div className="flex gap-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPixModal(false)}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                
+                {/* Botão de teste para desenvolvimento */}
+                {process.env.NODE_ENV === 'development' && (
+                  <Button
+                    onClick={simulatePaymentConfirmed}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+                  >
+                    🧪 Simular Pagamento
+                  </Button>
                 )}
               </div>
             </div>

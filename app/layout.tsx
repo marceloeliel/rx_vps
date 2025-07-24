@@ -4,68 +4,62 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "@/components/providers"
+import { WhatsAppFloatButton } from "@/components/whatsapp-float-button"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "RX Autos - Marketplace de Veículos",
-  description: "Encontre o veículo perfeito para você na RX Autos",
-  generator: 'v0.dev',
-  manifest: '/manifest.json',
-  keywords: ['veículos', 'carros', 'marketplace', 'comprar carro', 'vender carro'],
-  authors: [{ name: 'RX Autos Team' }],
-  creator: 'RX Autos',
-  publisher: 'RX Autos',
-  applicationName: 'RX Autos',
+  metadataBase: new URL('https://rxnegocios.com.br'),
+  title: {
+    template: '%s | RX AUTOS',
+    default: 'RX NEGOCIO | Conectando Agências de Carros com Compradores',
+  },
+  description: 'A RX Negocio é a plataforma ideal para quem quer vender ou comprar veículos com agilidade, segurança e praticidade. Conectamos agências de carros e revendas a compradores qualificados, facilitando negociações transparentes, com suporte e tecnologia de ponta.',
+  applicationName: 'RX AUTOS',
+  keywords: ['carros', 'veículos', 'compra', 'venda', 'agência', 'revenda', 'automóveis', 'negócios', 'rx negocio', 'rx autos'],
+  authors: [{ name: 'RX NEGOCIO' }],
+  creator: 'RX NEGOCIO',
+  publisher: 'RX NEGOCIO',
   formatDetection: {
+    email: false,
+    address: false,
     telephone: false,
   },
-  icons: {
-    icon: [
-      { url: '/images/rxveiculos.png', sizes: '32x32', type: 'image/png' },
-      { url: '/images/rxveiculos.png', sizes: '16x16', type: 'image/png' },
-      { url: '/images/rxveiculos.png', sizes: '96x96', type: 'image/png' },
-      { url: '/images/rxveiculos.png', sizes: '192x192', type: 'image/png' },
-      { url: '/images/rxveiculos.png', sizes: '512x512', type: 'image/png' },
-    ],
-    shortcut: '/images/rxveiculos.png',
-    apple: [
-      { url: '/images/rxveiculos.png', sizes: '152x152', type: 'image/png' },
-      { url: '/images/rxveiculos.png', sizes: '180x180', type: 'image/png' },
-    ],
-  },
   openGraph: {
+    title: 'RX NEGOCIO | Conectando Agências de Carros com Compradores',
+    description: 'A RX Negocio é a plataforma ideal para quem quer vender ou comprar veículos com agilidade, segurança e praticidade. Conectamos agências de carros e revendas a compradores qualificados.',
+    url: 'https://rxnegocios.com.br',
+    siteName: 'RX AUTOS',
+    locale: 'pt_BR',
     type: 'website',
-    siteName: 'RX Autos',
-    title: 'RX Autos - Marketplace de Veículos',
-    description: 'Encontre o veículo perfeito para você na RX Autos',
     images: [
       {
-        url: '/images/hero-car.png',
+        url: '/opengraph-image.png',
         width: 1200,
         height: 630,
-        alt: 'RX Autos - Marketplace de Veículos',
+        alt: 'RX NEGOCIO - Plataforma de Negócios Automotivos',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'RX Autos - Marketplace de Veículos',
-    description: 'Encontre o veículo perfeito para você na RX Autos',
-    images: ['/images/hero-car.png'],
+    title: 'RX NEGOCIO | Conectando Agências de Carros com Compradores',
+    description: 'Plataforma ideal para compra e venda de veículos com agilidade e segurança.',
+    images: ['/opengraph-image.png'],
   },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'RX Autos',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
-  other: {
-    'mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'default',
-    'apple-mobile-web-app-title': 'RX Autos',
-    'msapplication-TileColor': '#f97316',
-    'msapplication-tap-highlight': 'no',
+  verification: {
+    google: 'adicionar_codigo_verificacao_google',
   },
 }
 
@@ -92,6 +86,7 @@ export default function RootLayout({
           {children}
         </Providers>
         <Toaster />
+        <WhatsAppFloatButton />
         
         {/* Service Worker Script */}
         <script

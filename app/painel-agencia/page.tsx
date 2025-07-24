@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, useMemo } from "react"
-import { SubscriptionGuard } from "@/components/subscription-guard"
+
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

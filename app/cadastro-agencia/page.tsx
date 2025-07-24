@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { upsertAgencia, getAgenciaData, getAgenciaByCnpj, type DadosAgencia } from "@/lib/supabase/agencias-local"
 import { LogoUpload } from "@/components/logo-upload-local"
+import PromotionalBanner from "@/components/PromotionalBanner"
 
 interface ViaCepResponse {
   cep: string
@@ -453,8 +454,10 @@ export default function CadastroAgenciaPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('🔍 [FORM] Iniciando submissão do formulário')
 
     if (!user) {
+      console.error('❌ [FORM] Usuário não autenticado')
       toast({
         variant: "destructive",
         title: "Erro de autenticação",
@@ -464,6 +467,7 @@ export default function CadastroAgenciaPage() {
     }
 
     if (!acceptTerms) {
+      console.error('❌ [FORM] Termos não aceitos')
       toast({
         variant: "destructive",
         title: "Termos não aceitos",
@@ -473,6 +477,11 @@ export default function CadastroAgenciaPage() {
     }
 
     if (!empresaData.cnpj || !empresaData.razao_social || !empresaData.nome_fantasia) {
+      console.error('❌ [FORM] Dados obrigatórios não preenchidos:', {
+        cnpj: !empresaData.cnpj,
+        razao_social: !empresaData.razao_social,
+        nome_fantasia: !empresaData.nome_fantasia
+      })
       toast({
         variant: "destructive",
         title: "Dados obrigatórios",
@@ -482,6 +491,7 @@ export default function CadastroAgenciaPage() {
     }
 
     if (cnpjStatus === "invalid" || cnpjStatus === "exists") {
+      console.error('❌ [FORM] CNPJ inválido ou já existente:', { status: cnpjStatus })
       toast({
         variant: "destructive",
         title: "CNPJ inválido",
@@ -491,6 +501,7 @@ export default function CadastroAgenciaPage() {
     }
 
     setSaveLoading(true)
+    console.log('📝 [FORM] Preparando dados para salvar')
 
     toast({
       title: "Salvando dados...",
@@ -498,6 +509,7 @@ export default function CadastroAgenciaPage() {
     })
 
     try {
+      console.log('🔧 [FORM] Montando objeto de dados')
       const dadosParaSalvar: Partial<DadosAgencia> = {
         cnpj: empresaData.cnpj.replace(/\D/g, ""),
         razao_social: empresaData.razao_social,
@@ -526,9 +538,11 @@ export default function CadastroAgenciaPage() {
         servicos_oferecidos: servicos.length > 0 ? servicos : undefined,
       }
 
+      console.log('🚀 [FORM] Enviando dados para API:', dadosParaSalvar)
       const resultado = await upsertAgencia(user.id, dadosParaSalvar)
 
       if (resultado) {
+        console.log('✅ [FORM] Agência salva com sucesso:', resultado)
         toast({
           title: "🎉 Agência cadastrada com sucesso!",
           description: agenciaExistente
@@ -543,7 +557,7 @@ export default function CadastroAgenciaPage() {
         throw new Error("Erro ao salvar dados")
       }
     } catch (error) {
-      console.error("Erro ao salvar agência:", error)
+      console.error("❌ [FORM] Erro detalhado ao salvar agência:", error)
       toast({
         variant: "destructive",
         title: "Erro ao salvar",
@@ -631,6 +645,13 @@ export default function CadastroAgenciaPage() {
               : "Preencha as informações abaixo para cadastrar sua agência na RX Autos"}
           </p>
         </div>
+
+        {/* Banner Promocional - Apenas para novos cadastros */}
+        {!agenciaExistente && (
+          <div className="mb-8">
+            <PromotionalBanner variant="compact" />
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Informações Básicas com CNPJ */}
@@ -865,7 +886,7 @@ export default function CadastroAgenciaPage() {
                   <Input
                     id="telefone_principal"
                     type="tel"
-                    placeholder="(11) 3000-0000"
+                    placeholder="(73) 99999-9999"
                     value={contatoData.telefone_principal}
                     onChange={(e) => setContatoData((prev) => ({ ...prev, telefone_principal: e.target.value }))}
                     className="border-gray-200 focus:border-orange-500 focus:ring-orange-500"
@@ -880,7 +901,7 @@ export default function CadastroAgenciaPage() {
                   <Input
                     id="whatsapp"
                     type="tel"
-                    placeholder="(11) 99999-9999"
+                    placeholder="(73) 99999-9999"
                     value={contatoData.whatsapp}
                     onChange={(e) => setContatoData((prev) => ({ ...prev, whatsapp: e.target.value }))}
                     className="border-gray-200 focus:border-orange-500 focus:ring-orange-500"

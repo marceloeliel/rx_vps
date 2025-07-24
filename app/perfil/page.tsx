@@ -30,6 +30,7 @@ import {
   AlertCircle,
   Clock,
   DollarSign,
+  Receipt,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -42,7 +43,20 @@ import {
   type UserProfile,
 } from "@/lib/supabase/profiles"
 import { uploadProfilePhoto, deleteProfilePhoto } from "@/lib/supabase/profile-storage"
-import { useSubscription } from "@/hooks/use-subscription"
+import { UserPaymentsDashboard } from "@/components/user-payments-dashboard"
+import { 
+  formatPhone, 
+  formatCep, 
+  cleanPhone, 
+  cleanCep, 
+  validatePhone, 
+  validateCep,
+  validateCnpj,
+  cleanCnpj,
+  formatCnpj
+} from "@/lib/utils/masks"
+import { AgencyPanelButton } from "@/components/agency-panel-button"
+import { useSearchParams } from "next/navigation"
 
 interface ViaCepResponse {
   cep: string
@@ -99,28 +113,77 @@ export default function PerfilPage() {
   const router = useRouter()
   const supabase = createClient()
   const { toast } = useToast()
-  const { subscriptionStatus } = useSubscription()
+  
+  // Simplificar o hook de subscription para evitar problemas
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{
+    isActive: boolean
+    isExpired: boolean
+    planType: string | null
+    expirationDate: Date | null
+    daysUntilExpiration: number | null
+    hasAccess: boolean
+    needsRenewal: boolean
+  }>({
+    isActive: false,
+    isExpired: false,
+    planType: null,
+    expirationDate: null,
+    daysUntilExpiration: null,
+    hasAccess: false,
+    needsRenewal: false
+  })
+
+  const searchParams = useSearchParams()
+  const error = searchParams.get('error')
+
+  useEffect(() => {
+    // Mostrar mensagem de erro se foi redirecionado do painel da agência
+    if (error === 'agency_access_denied') {
+      toast({
+        variant: "destructive",
+        title: "Acesso restrito",
+        description: "Apenas agências cadastradas podem acessar o painel. Atualize seu perfil para tipo 'Agência' para ter acesso.",
+      })
+    }
+  }, [error, toast])
 
   // Verificar usuário e carregar perfil
   useEffect(() => {
     const getUser = async () => {
       try {
+        console.log('🔍 [PERFIL] Iniciando verificação de usuário...')
+        
         const {
           data: { user },
           error,
         } = await supabase.auth.getUser()
 
-        if (error || !user) {
+        if (error) {
+          console.error('❌ [PERFIL] Erro ao buscar usuário:', error)
+          toast({
+            variant: "destructive",
+            title: "Erro de autenticação",
+            description: "Erro ao verificar autenticação.",
+          })
           router.push("/login")
           return
         }
 
+        if (!user) {
+          console.log('⚠️ [PERFIL] Usuário não autenticado, redirecionando para login')
+          router.push("/login")
+          return
+        }
+
+        console.log('✅ [PERFIL] Usuário autenticado:', user.id)
         setUser(user)
 
         // Carregar perfil do usuário
+        console.log('🔍 [PERFIL] Buscando perfil do usuário...')
         const userProfile = await getUserProfile(user.id)
 
         if (userProfile) {
+          console.log('✅ [PERFIL] Perfil encontrado:', userProfile)
           setProfile(userProfile)
 
           // Preencher formulário com dados do perfil
@@ -146,11 +209,43 @@ export default function PerfilPage() {
 
           // Verificar faturas pendentes se for vendedor ou agência
           if (userProfile.tipo_usuario === "vendedor" || userProfile.tipo_usuario === "agencia") {
-            checkPendingInvoices(user.id)
+            console.log('💰 [PERFIL] Verificando faturas pendentes...')
+            // Temporariamente desabilitar verificação de faturas para evitar erros
+            console.log('⚠️ [PERFIL] Verificação de faturas temporariamente desabilitada')
+            setPendingInvoices({ 
+              hasPending: false, 
+              count: 0, 
+              totalValue: 0, 
+              loading: false, 
+              hasCustomerId: false 
+            })
+            // checkPendingInvoices(user.id) // Comentado temporariamente
           } else {
+            console.log('ℹ️ [PERFIL] Usuário é comprador, não verificando faturas')
             setPendingInvoices(prev => ({ ...prev, loading: false }))
           }
+
+          // Carregar status da subscription
+          if (userProfile.plano_atual && userProfile.plano_data_fim) {
+            const now = new Date()
+            const expirationDate = new Date(userProfile.plano_data_fim)
+            const daysUntilExpiration = Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            const isExpired = expirationDate < now
+            const isActive = !isExpired
+            const needsRenewal = daysUntilExpiration <= 3
+
+            setSubscriptionStatus({
+              isActive,
+              isExpired,
+              planType: userProfile.plano_atual,
+              expirationDate,
+              daysUntilExpiration,
+              hasAccess: isActive,
+              needsRenewal: needsRenewal || isExpired
+            })
+          }
         } else {
+          console.log('⚠️ [PERFIL] Perfil não encontrado, criando dados básicos')
           // Se não existe perfil, criar um básico
           setProfileData((prev) => ({
             ...prev,
@@ -161,7 +256,7 @@ export default function PerfilPage() {
           setPendingInvoices(prev => ({ ...prev, loading: false }))
         }
       } catch (error) {
-        console.error("Erro ao carregar usuário:", error)
+        console.error("❌ [PERFIL] Erro ao carregar usuário:", error)
         toast({
           variant: "destructive",
           title: "Erro",
@@ -169,6 +264,7 @@ export default function PerfilPage() {
         })
         setPendingInvoices(prev => ({ ...prev, loading: false }))
       } finally {
+        console.log('🏁 [PERFIL] Finalizando carregamento do perfil')
         setProfileLoading(false)
       }
     }
@@ -179,58 +275,159 @@ export default function PerfilPage() {
   // Verificar faturas pendentes
   const checkPendingInvoices = async (userId: string) => {
     try {
+      console.log('💰 [PERFIL] Iniciando verificação de faturas pendentes...')
       setPendingInvoices(prev => ({ ...prev, loading: true }))
 
       // Buscar customer_id do usuário
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("asaas_customer_id")
         .eq("id", userId)
         .single()
 
-      if (!profile?.asaas_customer_id) {
+      if (profileError) {
+        console.log('⚠️ [PERFIL] Erro ao buscar perfil:', profileError.message)
         setPendingInvoices({ hasPending: false, count: 0, totalValue: 0, loading: false, hasCustomerId: false })
         return
       }
 
-      // Buscar pagamentos pendentes
-      const response = await fetch(`/api/asaas/payments/customer/${profile.asaas_customer_id}`)
-      
-      if (!response.ok) {
-        console.error("❌ [PERFIL] Erro ao buscar pagamentos:", response.status, response.statusText)
-        const errorData = await response.json().catch(() => ({ error: "Erro desconhecido" }))
-        console.error("❌ [PERFIL] Detalhes do erro:", errorData)
-        throw new Error(`Erro ao buscar pagamentos: ${errorData.error || response.statusText}`)
+      if (!profile?.asaas_customer_id) {
+        console.log('⚠️ [PERFIL] Usuário não tem customer_id do Asaas')
+        setPendingInvoices({ hasPending: false, count: 0, totalValue: 0, loading: false, hasCustomerId: false })
+        return
       }
 
-      const paymentsData = await response.json()
-      const payments = paymentsData.data || paymentsData || []
+      console.log('🔍 [PERFIL] Buscando pagamentos pendentes no Asaas...')
       
-      // Filtrar apenas pagamentos pendentes ou vencidos
-      const pendingPayments = payments.filter((payment: any) => {
-        const now = new Date()
-        const dueDate = new Date(payment.dueDate)
+      // Adicionar timeout para evitar travamento
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos
+
+      try {
+        console.log("🔑 [DEBUG] process.env.ASAAS_API_KEY:", process.env.ASAAS_API_KEY);
+        const response = await fetch(`/api/asaas/payments/customer/${profile.asaas_customer_id}`, {
+          signal: controller.signal
+        })
         
-        return (
-          payment.status === "PENDING" || 
-          payment.status === "AWAITING_PAYMENT" || 
-          payment.status === "OVERDUE" ||
-          (payment.status === "PENDING" && dueDate < now)
-        )
-      })
+        clearTimeout(timeoutId)
+        
+        if (!response.ok) {
+          console.error("❌ [PERFIL] Erro ao buscar pagamentos:", response.status, response.statusText)
+          
+          // Se for erro 500, pode ser problema de configuração da API
+          if (response.status === 500) {
+            try {
+              const configErrorData = await response.json()
+              if (configErrorData.error?.includes('ASAAS_API_KEY não configurada')) {
+                console.log("⚠️ [PERFIL] API Asaas não configurada corretamente")
+                toast({
+                  variant: "destructive",
+                  title: "Erro de Configuração",
+                  description: "Sistema de pagamentos em manutenção. Verifique o .env e reinicie o servidor.",
+                })
+                setPendingInvoices({ 
+                  hasPending: false, 
+                  count: 0, 
+                  totalValue: 0, 
+                  loading: false, 
+                  hasCustomerId: true 
+                })
+                return
+              }
+            } catch (parseError) {
+              console.log("⚠️ [PERFIL] Não foi possível ler detalhes do erro")
+            }
+          }
+          
+          // Se for erro 401, é problema de autenticação da API
+          if (response.status === 401) {
+            console.log("⚠️ [PERFIL] Erro 401 - API Asaas não autenticada")
+            toast({
+              variant: "destructive",
+              title: "Erro de Autenticação",
+              description: "Sistema de pagamentos em manutenção. Por favor, tente novamente mais tarde.",
+            })
+            setPendingInvoices({ 
+              hasPending: false, 
+              count: 0, 
+              totalValue: 0, 
+              loading: false, 
+              hasCustomerId: true 
+            })
+            return
+          }
+          
+          // Para outros erros, tentar ler o JSON de erro
+          let responseErrorData = { error: "Erro desconhecido" }
+          try {
+            responseErrorData = await response.json()
+          } catch (parseError) {
+            console.log("⚠️ [PERFIL] Não foi possível ler detalhes do erro")
+          }
+          
+          console.log("❌ [PERFIL] Detalhes do erro:", responseErrorData)
+          
+          // Para qualquer erro, apenas log e continua sem quebrar a página
+          setPendingInvoices({ 
+            hasPending: false, 
+            count: 0, 
+            totalValue: 0, 
+            loading: false, 
+            hasCustomerId: true 
+          })
+          return
+        }
 
-      const totalValue = pendingPayments.reduce((sum: number, payment: any) => sum + (payment.value || 0), 0)
+        const paymentsData = await response.json()
+        const payments = paymentsData.data || paymentsData || []
+        
+        console.log('📊 [PERFIL] Pagamentos encontrados:', payments.length)
+        
+        // Filtrar apenas pagamentos pendentes ou vencidos
+        const pendingPayments = payments.filter((payment: any) => {
+          const now = new Date()
+          const dueDate = new Date(payment.dueDate)
+          
+          return (
+            payment.status === "PENDING" || 
+            payment.status === "AWAITING_PAYMENT" || 
+            payment.status === "OVERDUE" ||
+            (payment.status === "PENDING" && dueDate < now)
+          )
+        })
 
-      setPendingInvoices({
-        hasPending: pendingPayments.length > 0,
-        count: pendingPayments.length,
-        totalValue: totalValue,
-        loading: false,
-        hasCustomerId: true
-      })
+        console.log('📊 [PERFIL] Pagamentos pendentes encontrados:', pendingPayments.length)
+        
+        const totalValue = pendingPayments.reduce((sum: number, payment: any) => sum + (payment.value || 0), 0)
+
+        setPendingInvoices({
+          hasPending: pendingPayments.length > 0,
+          count: pendingPayments.length,
+          totalValue: totalValue,
+          loading: false,
+          hasCustomerId: true
+        })
+
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          console.log("⚠️ [PERFIL] Timeout na requisição para API Asaas")
+        } else {
+          console.error("❌ [PERFIL] Erro na requisição:", fetchError)
+        }
+        
+        setPendingInvoices({ 
+          hasPending: false, 
+          count: 0, 
+          totalValue: 0, 
+          loading: false, 
+          hasCustomerId: true 
+        })
+      }
 
     } catch (error) {
-      console.error("Erro ao verificar faturas pendentes:", error)
+      console.error("❌ [PERFIL] Erro geral ao verificar faturas pendentes:", error)
       setPendingInvoices({ hasPending: false, count: 0, totalValue: 0, loading: false, hasCustomerId: false })
     }
   }
@@ -242,10 +439,6 @@ export default function PerfilPage() {
     }).format(price)
   }
 
-  const formatCep = (value: string) => {
-    return value.replace(/\D/g, "").replace(/(\d{5})(\d)/, "$1-$2")
-  }
-
   const formatCpf = (value: string) => {
     return value.replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
   }
@@ -254,45 +447,10 @@ export default function PerfilPage() {
     return value.replace(/\D/g, "").replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5")
   }
 
-  const formatPhone = (value: string) => {
-    const numbers = value.replace(/\D/g, "")
-    if (numbers.length <= 10) {
-      return numbers.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3")
-    } else {
-      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")
-    }
-  }
-
-  const validateCpf = (cpf: string): boolean => {
-    const cleanCpf = cpf.replace(/\D/g, "")
-
-    if (cleanCpf.length !== 11 || /^(\d)\1{10}$/.test(cleanCpf)) {
-      return false
-    }
-
-    let sum = 0
-    for (let i = 0; i < 9; i++) {
-      sum += parseInt(cleanCpf.charAt(i)) * (10 - i)
-    }
-    let checkDigit = 11 - (sum % 11)
-    if (checkDigit === 10 || checkDigit === 11) checkDigit = 0
-    if (checkDigit !== parseInt(cleanCpf.charAt(9))) return false
-
-    sum = 0
-    for (let i = 0; i < 10; i++) {
-      sum += parseInt(cleanCpf.charAt(i)) * (11 - i)
-    }
-    checkDigit = 11 - (sum % 11)
-    if (checkDigit === 10 || checkDigit === 11) checkDigit = 0
-    if (checkDigit !== parseInt(cleanCpf.charAt(10))) return false
-
-    return true
-  }
-
   const buscarCep = async (cep: string) => {
-    const cleanCep = cep.replace(/\D/g, "")
+    const cleanedCep = cleanCep(cep)
 
-    if (cleanCep.length !== 8) {
+    if (cleanedCep.length !== 8) {
       toast({
         variant: "destructive",
         title: "CEP inválido",
@@ -304,7 +462,7 @@ export default function PerfilPage() {
     setCepLoading(true)
 
     try {
-      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`)
+      const response = await fetch(`https://viacep.com.br/ws/${cleanedCep}/json/`)
       const data: ViaCepResponse = await response.json()
 
       if (data.erro) {
@@ -340,12 +498,19 @@ export default function PerfilPage() {
     }
   }
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value)
+    setProfileData((prev) => ({ ...prev, whatsapp: formatted }))
+  }
+
   const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCep(e.target.value)
-    setEnderecoData((prev) => ({ ...prev, cep: formatted }))
+    setEnderecoData(prev => ({ ...prev, cep: formatted }))
 
-    if (formatted.replace(/\D/g, "").length === 8) {
-      buscarCep(formatted)
+    // Buscar CEP quando tiver 8 dígitos
+    const cleanedCep = cleanCep(formatted)
+    if (cleanedCep.length === 8) {
+      buscarCep(cleanedCep)
     }
   }
 
@@ -361,51 +526,62 @@ export default function PerfilPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validar tipo de arquivo
-    if (!file.type.startsWith("image/")) {
-      toast({
-        variant: "destructive",
-        title: "Arquivo inválido",
-        description: "Por favor, selecione apenas arquivos de imagem.",
-      })
-      return
-    }
-
-    // Validar tamanho (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        variant: "destructive",
-        title: "Arquivo muito grande",
-        description: "A imagem deve ter no máximo 5MB.",
-      })
-      return
-    }
-
-    // Limpar o input para permitir selecionar o mesmo arquivo novamente
-    e.target.value = ""
-
-    // Imediatamente processar a troca da foto
-    await handlePhotoUpload(file)
-  }
-
-  const handlePhotoUpload = async (file: File) => {
-    if (!file || !user?.id) return
-
-    setPhotoUploading(true)
-
     try {
-      // Se já existe uma foto, deletar a anterior
-      if (profile?.foto_perfil) {
-        console.log("🗑️ Deletando foto anterior:", profile.foto_perfil)
-        await deleteProfilePhoto(user.id, profile.foto_perfil)
+      console.log("📸 [PERFIL] Arquivo selecionado:", {
+        name: file.name,
+        type: file.type,
+        size: file.size
+      })
+
+      // Validar tipo de arquivo
+      if (!file.type.startsWith('image/')) {
+        toast({
+          variant: "destructive",
+          title: "Tipo de arquivo inválido",
+          description: "Por favor, selecione uma imagem (JPG, PNG ou WebP)."
+        })
+        return
       }
 
-      // Upload da nova foto
-      console.log("📤 Fazendo upload da nova foto...")
-      const uploadResult = await uploadProfilePhoto(user.id, file)
+      // Validar tamanho (2MB)
+      const maxSize = 2 * 1024 * 1024
+      if (file.size > maxSize) {
+        toast({
+          variant: "destructive",
+          title: "Arquivo muito grande",
+          description: "A imagem deve ter no máximo 2MB."
+        })
+        return
+      }
 
-      if (uploadResult.success && uploadResult.url) {
-        console.log("✅ Upload realizado com sucesso:", uploadResult.url)
+      // Limpar o input para permitir selecionar o mesmo arquivo novamente
+      e.target.value = ""
+
+      // Processar o upload da foto
+      setPhotoUploading(true)
+
+      try {
+        console.log("📤 [PERFIL] Iniciando upload da foto...")
+
+        // Se já existe uma foto, deletar a anterior
+        if (profile?.foto_perfil) {
+          console.log("🗑️ [PERFIL] Deletando foto anterior:", profile.foto_perfil)
+          await deleteProfilePhoto(user.id, profile.foto_perfil)
+        }
+
+        // Upload da nova foto
+        console.log("📤 [PERFIL] Fazendo upload da nova foto...")
+        const uploadResult = await uploadProfilePhoto(user.id, file)
+
+        if (!uploadResult.success) {
+          throw new Error(uploadResult.error || "Erro desconhecido no upload")
+        }
+
+        if (!uploadResult.url) {
+          throw new Error("URL da foto não foi gerada")
+        }
+
+        console.log("✅ [PERFIL] Upload realizado com sucesso:", uploadResult.url)
         
         // Atualizar perfil com nova foto
         const updatedProfile = await upsertUserProfile(user.id, {
@@ -418,30 +594,53 @@ export default function PerfilPage() {
           cep: enderecoData.cep.replace(/\D/g, ""),
         })
 
-        if (updatedProfile) {
-          setProfile(updatedProfile)
-
-          toast({
-            title: "Foto trocada com sucesso!",
-            description: "Sua foto de perfil foi substituída automaticamente.",
-          })
+        if (!updatedProfile) {
+          throw new Error("Erro ao atualizar perfil com a nova foto")
         }
-      } else {
-        throw new Error("Falha no upload da foto")
+
+        setProfile(updatedProfile)
+
+        toast({
+          title: "Foto trocada com sucesso!",
+          description: "Sua foto de perfil foi substituída automaticamente.",
+        })
+      } catch (error) {
+        console.error("❌ [PERFIL] Erro detalhado ao fazer upload da foto:", error)
+        
+        // Extrair mensagem de erro mais específica
+        let errorMessage = "Não foi possível trocar a foto. Tente novamente."
+        
+        if (error instanceof Error) {
+          if (error.message.includes("storage") || error.message.includes("bucket")) {
+            errorMessage = "Erro no armazenamento de fotos. Tente novamente mais tarde."
+          } else if (error.message.includes("tamanho") || error.message.includes("size")) {
+            errorMessage = "Arquivo muito grande. Use uma foto menor."
+          } else if (error.message.includes("tipo") || error.message.includes("type")) {
+            errorMessage = "Tipo de arquivo não suportado. Use JPG, PNG ou WebP."
+          } else {
+            errorMessage = error.message
+          }
+        }
+        
+        toast({
+          variant: "destructive",
+          title: "Erro na troca da foto",
+          description: errorMessage
+        })
+        
+        throw error // Re-throw para log no console
+      } finally {
+        setPhotoUploading(false)
       }
     } catch (error) {
-      console.error("❌ Erro ao fazer upload da foto:", error)
+      console.error("❌ [PERFIL] Erro ao processar foto:", error)
       toast({
         variant: "destructive",
-        title: "Erro na troca da foto",
-        description: "Não foi possível trocar a foto. Tente novamente.",
+        title: "Erro ao processar foto",
+        description: "Não foi possível processar a foto selecionada. Tente novamente."
       })
-    } finally {
-      setPhotoUploading(false)
     }
   }
-
-
 
   const handleSaveProfile = async () => {
     if (!user?.id) return
@@ -465,12 +664,48 @@ export default function PerfilPage() {
       return
     }
 
-    // Validar CPF se preenchido
-    if (profileData.cpf && !validateCpf(profileData.cpf)) {
+    // Validar CNPJ para agências
+    if (profileData.tipo_usuario === "agencia") {
+      const cleanedCnpj = cleanCnpj(profileData.cnpj)
+      if (!cleanedCnpj) {
+        toast({
+          variant: "destructive",
+          title: "CNPJ obrigatório",
+          description: "Para cadastro como agência, é necessário informar o CNPJ.",
+        })
+        return
+      }
+      // Validar formato e dígitos verificadores do CNPJ
+      if (!validateCnpj(cleanedCnpj)) {
+        toast({
+          variant: "destructive",
+          title: "CNPJ inválido",
+          description: "Digite um CNPJ válido. Ex: 12.345.678/0001-90",
+        })
+        return
+      }
+    }
+
+    // Limpar e validar telefone
+    const cleanedPhone = cleanPhone(profileData.whatsapp)
+    
+    // Validar formato do telefone
+    if (!validatePhone(cleanedPhone)) {
       toast({
         variant: "destructive",
-        title: "CPF inválido",
-        description: "Por favor, digite um CPF válido.",
+        title: "Telefone inválido",
+        description: "Digite um número de telefone válido com DDD + 8 ou 9 dígitos. Ex: (61) 9 1234-5678",
+      })
+      return
+    }
+
+    // Validar CEP se preenchido
+    const cleanedCep = enderecoData.cep ? cleanCep(enderecoData.cep) : ""
+    if (cleanedCep && !validateCep(cleanedCep)) {
+      toast({
+        variant: "destructive",
+        title: "CEP inválido",
+        description: "Digite um CEP válido com 8 dígitos.",
       })
       return
     }
@@ -479,9 +714,9 @@ export default function PerfilPage() {
 
     try {
       // Verificar se CPF já existe (se foi alterado)
-      const cleanCpf = profileData.cpf.replace(/\D/g, "")
-      if (cleanCpf && cleanCpf !== profile?.cpf) {
-        const cpfExists = await checkCpfExists(cleanCpf, user.id)
+      const cleanedCpf = cleanPhone(profileData.cpf)
+      if (cleanedCpf && cleanedCpf !== profile?.cpf) {
+        const cpfExists = await checkCpfExists(cleanedCpf, user.id)
         if (cpfExists) {
           toast({
             variant: "destructive",
@@ -494,9 +729,9 @@ export default function PerfilPage() {
       }
 
       // Verificar se CNPJ já existe (se foi alterado)
-      const cleanCnpj = profileData.cnpj.replace(/\D/g, "")
-      if (cleanCnpj && cleanCnpj !== profile?.cnpj) {
-        const cnpjExists = await checkCnpjExists(cleanCnpj, user.id)
+      const cleanedCnpj = cleanCnpj(profileData.cnpj)
+      if (cleanedCnpj && cleanedCnpj !== profile?.cnpj) {
+        const cnpjExists = await checkCnpjExists(cleanedCnpj, user.id)
         if (cnpjExists) {
           toast({
             variant: "destructive",
@@ -508,14 +743,69 @@ export default function PerfilPage() {
         }
       }
 
+      // Criar ou atualizar customer no Asaas
+      console.log("🔄 [PERFIL] Atualizando customer no Asaas...", {
+        userId: user.id,
+        name: profileData.nome_completo,
+        email: profileData.email,
+        cpfCnpj: cleanedCnpj || cleanedCpf,
+        phone: cleanedPhone,
+        mobilePhone: cleanedPhone
+      })
+
+      const asaasResponse = await fetch("/api/asaas/customers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          name: profileData.nome_completo,
+          email: profileData.email,
+          cpfCnpj: cleanedCnpj || cleanedCpf || undefined,
+          phone: cleanedPhone,
+          mobilePhone: cleanedPhone,
+          postalCode: cleanedCep || undefined,
+          address: enderecoData.endereco || undefined,
+          addressNumber: enderecoData.numero || undefined,
+          complement: enderecoData.complemento || undefined,
+          province: enderecoData.bairro || undefined,
+          city: enderecoData.cidade || undefined,
+          state: enderecoData.estado || undefined
+        })
+      })
+
+      if (!asaasResponse.ok) {
+        const errorData = await asaasResponse.json()
+        console.error("❌ [PERFIL] Erro ao criar/atualizar customer:", errorData)
+
+        // Tratar erro específico de telefone inválido
+        if (errorData.error === "Número de telefone inválido" || 
+            (errorData.details?.errors && errorData.details.errors.some((e: any) => 
+              e.includes('phone') || e.includes('mobilePhone')))) {
+          toast({
+            variant: "destructive",
+            title: "Telefone inválido",
+            description: errorData.details?.message || 
+                        "O número de telefone deve conter apenas números, com DDD + 8 ou 9 dígitos. Ex: 61912345678",
+          })
+          return
+        }
+
+        throw new Error(errorData.error || "Erro ao criar/atualizar customer no Asaas")
+      }
+
+      const asaasData = await asaasResponse.json()
+      console.log("✅ [PERFIL] Customer atualizado:", asaasData)
+
       // Salvar perfil
       const updatedProfile = await upsertUserProfile(user.id, {
         ...profileData,
-        cpf: cleanCpf,
-        cnpj: cleanCnpj,
-        whatsapp: profileData.whatsapp.replace(/\D/g, ""),
+        cpf: cleanedCpf,
+        cnpj: cleanedCnpj,
+        whatsapp: cleanedPhone,
         ...enderecoData,
-        cep: enderecoData.cep.replace(/\D/g, ""),
+        cep: cleanedCep || undefined,
       })
 
       if (updatedProfile) {
@@ -527,17 +817,18 @@ export default function PerfilPage() {
 
         // Se mudou para vendedor ou agência, verificar faturas
         if (profileData.tipo_usuario === "vendedor" || profileData.tipo_usuario === "agencia") {
-          checkPendingInvoices(user.id)
+          console.log('⚠️ [PERFIL] Verificação de faturas temporariamente desabilitada')
+          // checkPendingInvoices(user.id) // Comentado temporariamente
         }
       }
-    } catch (error: any) {
-      console.error("❌ [HANDLE_SAVE_PROFILE] Erro ao salvar perfil:", error)
+    } catch (error) {
+      console.error("❌ [PERFIL] Erro ao salvar perfil:", error)
       
       // Extrair mensagem de erro mais específica
       let errorMessage = "Não foi possível salvar o perfil. Tente novamente."
       let errorTitle = "Erro ao salvar"
       
-      if (error?.message) {
+      if (error instanceof Error) {
         if (error.message.includes("Erro de permissão")) {
           errorTitle = "Erro de Permissão"
           errorMessage = "Problema de permissão no banco de dados. Entre em contato com o suporte."
@@ -550,6 +841,9 @@ export default function PerfilPage() {
         } else if (error.message.includes("Erro ao verificar usuário")) {
           errorTitle = "Erro de Conexão"
           errorMessage = "Problema de conexão com o banco de dados. Tente novamente."
+        } else if (error.message.includes("Asaas")) {
+          errorTitle = "Erro no Asaas"
+          errorMessage = "Não foi possível atualizar seus dados de pagamento. Tente novamente."
         } else {
           // Usar a mensagem de erro customizada se disponível
           errorMessage = error.message
@@ -699,6 +993,7 @@ export default function PerfilPage() {
                     <p className="text-xs text-gray-500 mt-1">Email não pode ser alterado aqui</p>
                   </div>
 
+                  {/* Whatsapp Input */}
                   <div>
                     <Label htmlFor="whatsapp" className="text-sm font-medium text-gray-700">
                       Número (Whatsapp) *
@@ -707,11 +1002,11 @@ export default function PerfilPage() {
                       id="whatsapp"
                       type="tel"
                       value={profileData.whatsapp}
-                      onChange={(e) => handleProfileChange("whatsapp", formatPhone(e.target.value))}
+                      onChange={handlePhoneChange}
                       className="mt-1 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
-                      maxLength={16}
                       placeholder="(00) 0 0000-0000"
                       required
+                      disabled={saveLoading}
                     />
                     <p className="text-xs text-gray-500 mt-1">Digite seu número com DDD</p>
                   </div>
@@ -759,6 +1054,7 @@ export default function PerfilPage() {
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Endereço</h2>
 
                 <div className="space-y-4">
+                  {/* CEP Input */}
                   <div>
                     <Label htmlFor="cep" className="text-sm font-medium text-gray-700">
                       CEP
@@ -769,20 +1065,20 @@ export default function PerfilPage() {
                         type="text"
                         value={enderecoData.cep}
                         onChange={handleCepChange}
-                        placeholder="00000000"
+                        placeholder="00.000.000"
                         className="flex-1 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
-                        maxLength={8}
+                        disabled={saveLoading}
                       />
                       <Button
                         type="button"
                         onClick={() => buscarCep(enderecoData.cep)}
-                        disabled={cepLoading || enderecoData.cep.length !== 8}
+                        disabled={cepLoading || !validateCep(enderecoData.cep)}
                         className="bg-orange-500 hover:bg-orange-600 px-6"
                       >
                         {cepLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buscar"}
                       </Button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Digite apenas números</p>
+                    <p className="text-xs text-gray-500 mt-1">Digite o CEP para buscar o endereço automaticamente</p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -911,6 +1207,20 @@ export default function PerfilPage() {
                     </div>
                   ))}
                 </RadioGroup>
+              </CardContent>
+            </Card>
+
+            {/* Meus Pagamentos - Seção completa para todos os usuários */}
+            <Card>
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Receipt className="h-5 w-5 text-orange-500" />
+                  <h2 className="text-lg font-semibold text-gray-900">Meus Pagamentos</h2>
+                </div>
+                <p className="text-sm text-gray-600 mb-6">
+                  Acompanhe todas as suas cobranças, pagamentos e histórico financeiro.
+                </p>
+                <UserPaymentsDashboard />
               </CardContent>
             </Card>
 
@@ -1253,12 +1563,11 @@ export default function PerfilPage() {
                     </div>
                     <h3 className="font-medium text-gray-900 mb-2">Painel da Agência</h3>
                     <p className="text-xs text-gray-600 mb-3">Gerencie sua agência</p>
-                    <Link href="/painel-agencia">
-                      <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white w-full">
-                        <Building2 className="h-3 w-3 mr-2" />
-                        Acessar Painel
-                      </Button>
-                    </Link>
+                    <AgencyPanelButton 
+                      userType={profileData.tipo_usuario} 
+                      variant="outline" 
+                      className="w-full"
+                    />
                   </div>
                 </CardContent>
               </Card>

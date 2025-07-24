@@ -21,9 +21,10 @@ interface Plan {
 }
 
 const plans: Record<string, Plan> = {
-  basico: { id: "basico", name: "Plano Básico", price: 49.9, duration: "1 mês" },
-  profissional: { id: "profissional", name: "Plano Profissional", price: 99.9, duration: "1 mês" },
-  empresarial: { id: "empresarial", name: "Plano Empresarial", price: 199.9, duration: "1 mês" },
+  basico: { id: "basico", name: "Plano Básico", price: 59.9, duration: "1 mês" },
+  profissional: { id: "profissional", name: "Plano Profissional", price: 299.0, duration: "1 mês" },
+  empresarial: { id: "empresarial", name: "Plano Empresarial", price: 897.9, duration: "1 mês" },
+  ilimitado: { id: "ilimitado", name: "Plano Ilimitado", price: 1897.9, duration: "1 mês" },
 }
 
 type PaymentMethod = "pix" | "boleto" | "cartao"
@@ -514,6 +515,8 @@ export default function CheckoutPage() {
         return <Badge className="bg-yellow-500 text-white">Pendente</Badge>
       case "RECEIVED":
         return <Badge className="bg-blue-500 text-white">Recebido</Badge>
+      case "RECEIVED_IN_CASH":
+        return <Badge className="bg-green-500 text-white">Pago em Dinheiro</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }

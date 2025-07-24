@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { SubscriptionGuard } from "@/components/subscription-guard"
+import SubscriptionGuard from "@/components/subscription-guard"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -111,7 +111,7 @@ export default function MeusVeiculosPage() {
   }
 
   return (
-    <SubscriptionGuard feature="create_vehicle">
+    <SubscriptionGuard>
       <div className="min-h-screen bg-gray-50 py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}

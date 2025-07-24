@@ -67,6 +67,7 @@ export default function SimuladorPage() {
   const [loadingUserData, setLoadingUserData] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [salvandoSimulacao, setSalvandoSimulacao] = useState(false)
+  const [simulacaoSalva, setSimulacaoSalva] = useState(false)
   const [formData, setFormData] = useState<StepData>({
     tipoDocumento: "pf",
     cpfCnpj: "",
@@ -443,9 +444,9 @@ export default function SimuladorPage() {
     }
 
     setFormData(dadosAtualizados)
-
-    // Salvar simulação no banco de dados
-    await salvarSimulacaoNoBanco(dadosAtualizados)
+    
+    // Resetar estado de simulação salva ao recalcular
+    setSimulacaoSalva(false)
   }
 
   const salvarSimulacaoNoBanco = async (dados: StepData) => {
@@ -494,19 +495,35 @@ export default function SimuladorPage() {
         toast({
           variant: "destructive",
           title: "Erro ao salvar simulação",
-          description: "Não foi possível salvar a simulação, mas você pode continuar normalmente.",
+          description: "Não foi possível salvar a simulação. Tente novamente.",
         })
+        return false
       } else {
         console.log('✅ [SIMULADOR] Simulação salva com sucesso:', data?.id)
         toast({
-          title: "Simulação salva!",
-          description: "Sua simulação foi salva automaticamente.",
+          title: "Simulação salva com sucesso!",
+          description: "Sua simulação foi salva e pode ser consultada a qualquer momento.",
         })
+        setSimulacaoSalva(true)
+        return true
       }
     } catch (error) {
       console.error('❌ [SIMULADOR] Erro inesperado ao salvar:', error)
+      toast({
+        variant: "destructive",
+        title: "Erro ao salvar simulação",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
+      })
+      return false
     } finally {
       setSalvandoSimulacao(false)
+    }
+  }
+
+  const handleSalvarSimulacao = async () => {
+    const sucesso = await salvarSimulacaoNoBanco(formData)
+    if (sucesso) {
+      // Ação adicional se necessário
     }
   }
 
@@ -618,7 +635,7 @@ export default function SimuladorPage() {
                   type="tel"
                   value={formData.telefone}
                   onChange={(e) => handleInputChange("telefone", e.target.value)}
-                  placeholder={loadingUserData ? "Carregando..." : "(11) 99999-9999"}
+                                          placeholder={loadingUserData ? "Carregando..." : "(73) 99999-9999"}
                   maxLength={15}
                   disabled={loadingUserData}
                   className="mt-1"
@@ -1089,7 +1106,14 @@ export default function SimuladorPage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-6">
               <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
               <h3 className="text-xl font-bold text-gray-900 mb-2">Simulação Concluída!</h3>
-              <p className="text-gray-600 mb-6">Veja as condições especiais que conseguimos para você</p>
+              <p className="text-gray-600 mb-4">Veja as condições especiais que conseguimos para você</p>
+              
+              {/* Dica sobre o sistema de salvamento */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-xs text-blue-700 text-center">
+                  💡 <strong>Dica:</strong> Teste diferentes valores à vontade! Você só salva quando quiser.
+                </p>
+              </div>
               
               {/* Indicador de salvamento */}
               {salvandoSimulacao && (
@@ -1097,6 +1121,16 @@ export default function SimuladorPage() {
                   <div className="flex items-center justify-center gap-2 text-blue-700">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="text-sm">Salvando simulação...</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Indicador de simulação salva */}
+              {simulacaoSalva && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center justify-center gap-2 text-green-700">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-sm">Simulação salva com sucesso!</span>
                   </div>
                 </div>
               )}
@@ -1127,22 +1161,97 @@ export default function SimuladorPage() {
                   <div className="text-xs text-gray-600 mb-2">Prazo de financiamento</div>
                   <div className="text-sm font-semibold">{formData.prazo} parcelas mensais</div>
                 </div>
+                
+                {/* Ajustar valores diretamente na tela de resultado */}
+                <div className="border-t pt-4 space-y-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600 mb-3">
+                      Quer testar outros valores? Ajuste aqui mesmo:
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="entrada-result" className="text-sm font-medium text-gray-700">
+                        Valor da Entrada
+                      </Label>
+                      <Input
+                        id="entrada-result"
+                        type="text"
+                        value={formData.entrada}
+                        onChange={(e) => {
+                          const value = formatCurrency(e.target.value)
+                          setFormData(prev => ({ ...prev, entrada: value }))
+                          setSimulacaoSalva(false) // Marcar como não salva ao alterar
+                        }}
+                        placeholder="R$ 0,00"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="prazo-result" className="text-sm font-medium text-gray-700">
+                        Prazo (meses)
+                      </Label>
+                      <Input
+                        id="prazo-result"
+                        type="number"
+                        value={formData.prazo}
+                        onChange={(e) => {
+                          setFormData(prev => ({ ...prev, prazo: e.target.value }))
+                          setSimulacaoSalva(false) // Marcar como não salva ao alterar
+                        }}
+                        min="12"
+                        max="72"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <Button 
+                      onClick={calcularSimulacao}
+                      variant="outline"
+                      className="border-orange-500 text-orange-500 hover:bg-orange-50 flex items-center gap-2"
+                    >
+                      <Calculator className="h-4 w-4" />
+                      Recalcular
+                    </Button>
+                  </div>
+                </div>
               </div>
               
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <Button 
-                  onClick={() => router.push("/cadastro-veiculo")}
-                  className="bg-orange-500 hover:bg-orange-600 text-white flex-1"
-                >
-                  Anunciar Meu Veículo
-                </Button>
-                <Button 
-                  onClick={() => router.push("/veiculos")}
-                  variant="outline"
-                  className="border-orange-500 text-orange-500 hover:bg-orange-50 flex-1"
-                >
-                  Ver Veículos Disponíveis
-                </Button>
+              <div className="space-y-4 mt-6">
+                {/* Botão Salvar Simulação */}
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 mb-3">
+                    Gostou do resultado? Salve sua simulação para consultar depois!
+                  </p>
+                  <Button 
+                    onClick={handleSalvarSimulacao}
+                    disabled={salvandoSimulacao || simulacaoSalva}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 flex items-center gap-2 mx-auto"
+                  >
+                    {salvandoSimulacao ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : simulacaoSalva ? (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        Simulação Salva
+                      </>
+                    ) : (
+                      <>
+                        <Calculator className="h-4 w-4" />
+                        Salvar Simulação
+                      </>
+                    )}
+                  </Button>
+                </div>
+                
+
               </div>
             </div>
           </div>
@@ -1251,6 +1360,25 @@ export default function SimuladorPage() {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Botões de Ação */}
+                  <div className="space-y-3 mt-6">
+                    <Button 
+                      onClick={() => router.push("/cadastro-veiculo")}
+                      className="w-full bg-gradient-to-r from-white/20 to-white/30 hover:from-white/30 hover:to-white/40 text-white border border-white/30 hover:border-white/50 backdrop-blur-sm transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform py-3 relative overflow-hidden group"
+                    >
+                      <span className="relative z-10 font-medium">Anunciar Meu Veículo</span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                    </Button>
+                    <Button 
+                      onClick={() => router.push("/veiculos")}
+                      variant="outline"
+                      className="w-full bg-gradient-to-r from-white to-orange-50 hover:from-orange-50 hover:to-orange-100 text-orange-600 border-white hover:border-orange-200 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform py-3 relative overflow-hidden group"
+                    >
+                      <span className="relative z-10 font-medium">Ver Veículos Disponíveis</span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-100/20 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1326,6 +1454,25 @@ export default function SimuladorPage() {
                 <p className="text-orange-100 text-xs">✓ 100% digital e rápido</p>
                 <p className="text-orange-100 text-xs">✓ Melhores condições do mercado</p>
               </div>
+            </div>
+            
+            {/* Botões de Ação Mobile */}
+            <div className="space-y-2 mt-4">
+              <Button 
+                onClick={() => router.push("/cadastro-veiculo")}
+                className="w-full bg-gradient-to-r from-white/20 to-white/30 hover:from-white/30 hover:to-white/40 text-white border border-white/30 hover:border-white/50 backdrop-blur-sm transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform py-2 text-sm relative overflow-hidden group"
+              >
+                <span className="relative z-10 font-medium">Anunciar Meu Veículo</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+              </Button>
+              <Button 
+                onClick={() => router.push("/veiculos")}
+                variant="outline"
+                className="w-full bg-gradient-to-r from-white to-orange-50 hover:from-orange-50 hover:to-orange-100 text-orange-600 border-white hover:border-orange-200 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform py-2 text-sm relative overflow-hidden group"
+              >
+                <span className="relative z-10 font-medium">Ver Veículos Disponíveis</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-100/20 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+              </Button>
             </div>
           </div>
         </div>

@@ -60,63 +60,93 @@ export interface DadosAgenciaInput {
   servicos_oferecidos?: string[]
 }
 
-// Função para verificar se a tabela existe
+// Verificar se uma tabela existe
 async function checkTableExists(supabase: any, tableName: string): Promise<boolean> {
+  console.log('🔍 [AGENCIA] Verificando existência da tabela:', tableName)
   try {
-    const { error } = await supabase.from(tableName).select("*").limit(1)
-    return !error || error.code !== "42P01" // 42P01 = relation does not exist
-  } catch {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('id')
+      .limit(1)
+
+    if (error) {
+      console.error('❌ [AGENCIA] Erro ao verificar tabela:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
+      return false
+    }
+
+    console.log('✅ [AGENCIA] Tabela verificada com sucesso:', { exists: true, tableName })
+    return true
+  } catch (error) {
+    console.error('❌ [AGENCIA] Erro inesperado ao verificar tabela:', error)
     return false
   }
 }
 
-// Função para converter servicos_oferecidos de string para array
-function parseServicos(servicosString: string | null): string[] {
-  if (!servicosString) return []
+// Converter array de serviços para string JSON
+function stringifyServicos(servicos?: string[]): string | undefined {
+  if (!servicos || !Array.isArray(servicos) || servicos.length === 0) {
+    return undefined
+  }
   try {
-    return JSON.parse(servicosString)
-  } catch {
-    return []
+    return JSON.stringify(servicos)
+  } catch (error) {
+    console.error('❌ [AGENCIA] Erro ao converter serviços para JSON:', error)
+    return undefined
   }
 }
 
-// Função para converter servicos_oferecidos de array para string
-function stringifyServicos(servicosArray: string[] | null | undefined): string | null {
-  if (!servicosArray || servicosArray.length === 0) return null
-  return JSON.stringify(servicosArray)
+// Converter string JSON para array de serviços
+function parseServicos(servicos?: string | null): string[] | undefined {
+  if (!servicos) {
+    return undefined
+  }
+  try {
+    const parsed = JSON.parse(servicos)
+    return Array.isArray(parsed) ? parsed : undefined
+  } catch (error) {
+    console.error('❌ [AGENCIA] Erro ao converter JSON para array de serviços:', error)
+    return undefined
+  }
 }
 
-// Buscar dados da agência por user_id
+// Buscar dados da agência
 export async function getAgenciaData(userId: string): Promise<DadosAgencia | null> {
   const supabase = createClient()
+  console.log('🔍 [AGENCIA] Buscando dados da agência para userId:', userId)
 
   try {
-    // Verificar se a tabela existe
-    const tableExists = await checkTableExists(supabase, "dados_agencia")
-
-    if (!tableExists) {
-      console.warn("Tabela dados_agencia não existe.")
-      return null
-    }
-
-    const { data, error } = await supabase.from("dados_agencia").select("*").eq("user_id", userId).single()
+    const { data, error } = await supabase
+      .from('dados_agencia')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
 
     if (error) {
-      if (error.code === "PGRST116") {
-        // Nenhum registro encontrado
+      if (error.code === 'PGRST116') { // not found
+        console.log('ℹ️ [AGENCIA] Nenhuma agência encontrada para o usuário')
         return null
       }
-      console.error("Erro ao buscar dados da agência:", error)
+      console.error('❌ [AGENCIA] Erro ao buscar agência:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
       return null
     }
 
-    // Converter servicos_oferecidos de string para array
+    console.log('✅ [AGENCIA] Dados da agência encontrados:', data)
     return {
       ...data,
-      servicos_oferecidos: parseServicos(data.servicos_oferecidos),
+      servicos_oferecidos: data.servicos_oferecidos ? JSON.parse(data.servicos_oferecidos) : undefined
     }
   } catch (error) {
-    console.error("Erro inesperado ao buscar agência:", error)
+    console.error('❌ [AGENCIA] Erro inesperado ao buscar agência:', error)
     return null
   }
 }
@@ -157,36 +187,77 @@ export async function getAgenciaById(id: number): Promise<DadosAgencia | null> {
 // Criar nova agência
 export async function createAgencia(userId: string, agenciaData: DadosAgenciaInput): Promise<DadosAgencia | null> {
   const supabase = createClient()
+  console.log('🔍 [AGENCIA] Iniciando criação de agência para userId:', userId)
 
   try {
-    // Verificar se a tabela existe
-    const tableExists = await checkTableExists(supabase, "dados_agencia")
+    // Verificar se já existe uma agência para este usuário
+    const { data: existingAgencia } = await supabase
+      .from('dados_agencia')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
 
-    if (!tableExists) {
-      console.error("Tabela dados_agencia não existe. Execute o script SQL primeiro.")
-      return null
+    if (existingAgencia) {
+      console.log('⚠️ [AGENCIA] Usuário já possui uma agência cadastrada')
+      return existingAgencia
     }
 
+    // Preparar dados para inserção
     const dataToInsert = {
       user_id: userId,
-      ...agenciaData,
-      servicos_oferecidos: stringifyServicos(agenciaData.servicos_oferecidos),
-      updated_at: new Date().toISOString(),
+      nome_fantasia: agenciaData.nome_fantasia,
+      razao_social: agenciaData.razao_social,
+      cnpj: agenciaData.cnpj?.replace(/\D/g, ''),
+      inscricao_estadual: agenciaData.inscricao_estadual,
+      ano_fundacao: agenciaData.ano_fundacao ? Number(agenciaData.ano_fundacao) : null,
+      especialidades: agenciaData.especialidades,
+      telefone_principal: agenciaData.telefone_principal,
+      whatsapp: agenciaData.whatsapp,
+      email: agenciaData.email,
+      website: agenciaData.website,
+      endereco: agenciaData.endereco,
+      numero: agenciaData.numero,
+      complemento: agenciaData.complemento,
+      bairro: agenciaData.bairro,
+      cidade: agenciaData.cidade,
+      estado: agenciaData.estado,
+      cep: agenciaData.cep?.replace(/\D/g, ''),
+      total_vendedores: agenciaData.total_vendedores ? Number(agenciaData.total_vendedores) : 0,
+      total_clientes: agenciaData.total_clientes ? Number(agenciaData.total_clientes) : 0,
+      vendas_mes: agenciaData.vendas_mes ? Number(agenciaData.vendas_mes) : 0,
+      vendas_ano: agenciaData.vendas_ano ? Number(agenciaData.vendas_ano) : 0,
+      logo_url: agenciaData.logo_url,
+      descricao: agenciaData.descricao,
+      horario_funcionamento: agenciaData.horario_funcionamento,
+      servicos_oferecidos: agenciaData.servicos_oferecidos ? JSON.stringify(agenciaData.servicos_oferecidos) : null
     }
 
-    const { data, error } = await supabase.from("dados_agencia").insert(dataToInsert).select().single()
+    console.log('📝 [AGENCIA] Dados preparados para inserção:', dataToInsert)
+
+    // Inserir dados
+    const { data, error } = await supabase
+      .from('dados_agencia')
+      .insert(dataToInsert)
+      .select()
+      .single()
 
     if (error) {
-      console.error("Erro ao criar agência:", error)
+      console.error('❌ [AGENCIA] Erro ao criar agência:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
       return null
     }
 
+    console.log('✅ [AGENCIA] Agência criada com sucesso:', data)
     return {
       ...data,
-      servicos_oferecidos: parseServicos(data.servicos_oferecidos),
+      servicos_oferecidos: data.servicos_oferecidos ? JSON.parse(data.servicos_oferecidos) : undefined
     }
   } catch (error) {
-    console.error("Erro inesperado ao criar agência:", error)
+    console.error('❌ [AGENCIA] Erro inesperado ao criar agência:', error)
     return null
   }
 }
@@ -194,40 +265,77 @@ export async function createAgencia(userId: string, agenciaData: DadosAgenciaInp
 // Atualizar agência existente
 export async function updateAgencia(userId: string, agenciaData: DadosAgenciaInput): Promise<DadosAgencia | null> {
   const supabase = createClient()
+  console.log('🔍 [AGENCIA] Iniciando atualização de agência para userId:', userId)
 
   try {
-    // Verificar se a tabela existe
-    const tableExists = await checkTableExists(supabase, "dados_agencia")
+    // Verificar se a agência existe
+    const { data: existingAgencia } = await supabase
+      .from('dados_agencia')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
 
-    if (!tableExists) {
-      console.error("Tabela dados_agencia não existe. Execute o script SQL primeiro.")
+    if (!existingAgencia) {
+      console.log('⚠️ [AGENCIA] Agência não encontrada para atualização')
       return null
     }
 
+    // Preparar dados para atualização
     const dataToUpdate = {
-      ...agenciaData,
-      servicos_oferecidos: stringifyServicos(agenciaData.servicos_oferecidos),
-      updated_at: new Date().toISOString(),
+      nome_fantasia: agenciaData.nome_fantasia,
+      razao_social: agenciaData.razao_social,
+      cnpj: agenciaData.cnpj?.replace(/\D/g, ''),
+      inscricao_estadual: agenciaData.inscricao_estadual,
+      ano_fundacao: agenciaData.ano_fundacao ? Number(agenciaData.ano_fundacao) : null,
+      especialidades: agenciaData.especialidades,
+      telefone_principal: agenciaData.telefone_principal,
+      whatsapp: agenciaData.whatsapp,
+      email: agenciaData.email,
+      website: agenciaData.website,
+      endereco: agenciaData.endereco,
+      numero: agenciaData.numero,
+      complemento: agenciaData.complemento,
+      bairro: agenciaData.bairro,
+      cidade: agenciaData.cidade,
+      estado: agenciaData.estado,
+      cep: agenciaData.cep?.replace(/\D/g, ''),
+      total_vendedores: agenciaData.total_vendedores ? Number(agenciaData.total_vendedores) : 0,
+      total_clientes: agenciaData.total_clientes ? Number(agenciaData.total_clientes) : 0,
+      vendas_mes: agenciaData.vendas_mes ? Number(agenciaData.vendas_mes) : 0,
+      vendas_ano: agenciaData.vendas_ano ? Number(agenciaData.vendas_ano) : 0,
+      logo_url: agenciaData.logo_url,
+      descricao: agenciaData.descricao,
+      horario_funcionamento: agenciaData.horario_funcionamento,
+      servicos_oferecidos: agenciaData.servicos_oferecidos ? JSON.stringify(agenciaData.servicos_oferecidos) : null
     }
 
+    console.log('📝 [AGENCIA] Dados preparados para atualização:', dataToUpdate)
+
+    // Atualizar dados
     const { data, error } = await supabase
-      .from("dados_agencia")
+      .from('dados_agencia')
       .update(dataToUpdate)
-      .eq("user_id", userId)
+      .eq('user_id', userId)
       .select()
       .single()
 
     if (error) {
-      console.error("Erro ao atualizar agência:", error)
+      console.error('❌ [AGENCIA] Erro ao atualizar agência:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
       return null
     }
 
+    console.log('✅ [AGENCIA] Agência atualizada com sucesso:', data)
     return {
       ...data,
-      servicos_oferecidos: parseServicos(data.servicos_oferecidos),
+      servicos_oferecidos: data.servicos_oferecidos ? JSON.parse(data.servicos_oferecidos) : undefined
     }
   } catch (error) {
-    console.error("Erro inesperado ao atualizar agência:", error)
+    console.error('❌ [AGENCIA] Erro inesperado ao atualizar agência:', error)
     return null
   }
 }
@@ -249,58 +357,66 @@ export async function upsertAgencia(userId: string, agenciaData: DadosAgenciaInp
 // Deletar agência
 export async function deleteAgencia(userId: string): Promise<boolean> {
   const supabase = createClient()
+  console.log('🔍 [AGENCIA] Iniciando exclusão de agência para userId:', userId)
 
   try {
-    // Verificar se a tabela existe
-    const tableExists = await checkTableExists(supabase, "dados_agencia")
-
-    if (!tableExists) {
-      console.warn("Tabela dados_agencia não existe.")
-      return true // Retornar sucesso pois não há nada para deletar
-    }
-
-    const { error } = await supabase.from("dados_agencia").delete().eq("user_id", userId)
+    const { error } = await supabase
+      .from('dados_agencia')
+      .delete()
+      .eq('user_id', userId)
 
     if (error) {
-      console.error("Erro ao deletar agência:", error)
+      console.error('❌ [AGENCIA] Erro ao deletar agência:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
       return false
     }
 
+    console.log('✅ [AGENCIA] Agência deletada com sucesso')
     return true
   } catch (error) {
-    console.error("Erro inesperado ao deletar agência:", error)
+    console.error('❌ [AGENCIA] Erro inesperado ao deletar agência:', error)
     return false
   }
 }
 
-// Buscar agências por CNPJ (para validação de unicidade)
+// Buscar agência por CNPJ
 export async function getAgenciaByCnpj(cnpj: string): Promise<DadosAgencia | null> {
   const supabase = createClient()
+  console.log('🔍 [AGENCIA] Buscando agência por CNPJ:', cnpj)
 
   try {
-    // Verificar se a tabela existe
-    const tableExists = await checkTableExists(supabase, "dados_agencia")
-
-    if (!tableExists) {
-      return null
-    }
-
-    const { data, error } = await supabase.from("dados_agencia").select("*").eq("cnpj", cnpj).single()
+    const cleanCnpj = cnpj.replace(/\D/g, '')
+    const { data, error } = await supabase
+      .from('dados_agencia')
+      .select('*')
+      .eq('cnpj', cleanCnpj)
+      .single()
 
     if (error) {
-      if (error.code === "PGRST116") {
+      if (error.code === 'PGRST116') { // not found
+        console.log('ℹ️ [AGENCIA] Nenhuma agência encontrada para o CNPJ')
         return null
       }
-      console.error("Erro ao buscar agência por CNPJ:", error)
+      console.error('❌ [AGENCIA] Erro ao buscar agência por CNPJ:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
       return null
     }
 
+    console.log('✅ [AGENCIA] Agência encontrada por CNPJ:', data)
     return {
       ...data,
-      servicos_oferecidos: parseServicos(data.servicos_oferecidos),
+      servicos_oferecidos: data.servicos_oferecidos ? JSON.parse(data.servicos_oferecidos) : undefined
     }
   } catch (error) {
-    console.error("Erro inesperado ao buscar agência por CNPJ:", error)
+    console.error('❌ [AGENCIA] Erro inesperado ao buscar agência por CNPJ:', error)
     return null
   }
 }
