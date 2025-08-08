@@ -1,18 +1,61 @@
-NODE_ENV=development
-NEXTAUTH_URL=https://rxnegocio.com.br
-NEXTAUTH_SECRET=sua_chave_secreta_nextauth
-NEXT_PUBLIC_SUPABASE_URL=https://ecdmpndeunbzhaihabvi.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjZG1wbmRldW5iemhhaWhhYnZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5MzExMDcsImV4cCI6MjA2MTUwNzEwN30.R_9A1kphbMK37pBsEuzm--ujaXv52i80oKGP46VygLM
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjZG1wbmRldW5iemhhaWhhYnZpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NTkzMTEwNywiZXhwIjoyMDYxNTA3MTA3fQ.2CdNPp5I8RVsIqU1IJH3T_OHZDnveO7ZOZt4bn9QVn0
-DATABASE_URL=postgresql://postgres.ecdmpndeunbzhaihabvi:T0nFRFXDZRaETRLV@aws-0-sa-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
-WEBHOOK_URL=https://hooks.slack.com/services/...
-ADMIN_EMAIL=admin@seudominio.com
-POSTGRES_HOST=aws-0-sa-east-1.pooler.supabase.com
-POSTGRES_PORT=6543
-POSTGRES_DB=postgres
-POSTGRES_USER=postgres.ecdmpndeunbzhaihabvi
-POSTGRES_PASSWORD=T0nFRFXDZRaETRLV
-POSTGRES_POOL_MODE=transaction
-NEXT_PUBLIC_FIPE_API_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxYWZmMzBjMS1lMjhlLTRjNjctYTkwYS0zNGVlNzUyNmJlYTAiLCJlbWFpbCI6InNlZ3RyYWtlckBnbWFpbC5jb20iLCJpYXQiOjE3Mzk1NDYwMTJ
-NEXT_PUBLIC_APP_URL=https://rxnegocio.com.br
-WEBSITE_URL=https://rxnegocio.com.br
+version: '3.8'
+
+services:
+  # Aplicação RX Veículos
+  rx-veiculos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: "3000"
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+      WEBHOOK_URL: ${WEBHOOK_URL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_POOL_MODE: ${POSTGRES_POOL_MODE}
+      NEXT_PUBLIC_FIPE_API_TOKEN: ${NEXT_PUBLIC_FIPE_API_TOKEN}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      WEBSITE_URL: ${WEBSITE_URL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - rx-network
+
+  # Nginx Reverse Proxy (opcional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - rx-veiculos
+    restart: unless-stopped
+    networks:
+      - rx-network
+
+networks:
+  rx-network:
+    driver: bridge
+
+volumes:
+  ssl_certs:
