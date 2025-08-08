@@ -19,8 +19,13 @@
 ### **2. Configurar Repositório**
 ```
 Repository URL: https://github.com/marceloeliel/rx-git
-Compose path: docker-compose.portainer.yml
+Compose path: docker-compose.yml
 Branch: main
+```
+
+**💡 Alternativa**: Se houver erro com `docker-compose.yml`, use:
+```
+Compose path: docker-compose.portainer.yml
 ```
 
 ### **3. Configurar Variáveis de Ambiente**
@@ -101,8 +106,15 @@ wget https://raw.githubusercontent.com/marceloeliel/rx-git/main/Dockerfile
 
 ## **🚨 Solução de Problemas**
 
+### **Erro: "no such file or directory: docker-compose.portainer.yml"**
+✅ **Solução**:
+1. **Método Principal**: Use `docker-compose.yml` como Compose path
+2. **Método Web Editor**: Copie o conteúdo do arquivo e cole no editor
+3. **Verificar Branch**: Certifique-se que está usando branch `main`
+4. **Repositório Público**: Confirme que o repositório está acessível
+
 ### **Erro: ".env.local not found"**
-✅ **Solução**: Use `docker-compose.portainer.yml` que não depende de arquivos .env
+✅ **Solução**: Use `docker-compose.yml` que tem variáveis de ambiente configuradas
 
 ### **Erro: "Build failed"**
 ✅ **Verificar**:
