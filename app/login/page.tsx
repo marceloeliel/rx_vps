@@ -94,7 +94,14 @@ export default function LoginPage() {
 
         // Aguardar um pouco para mostrar o toast antes de redirecionar
         setTimeout(() => {
-          router.push("/")
+          // Verificar se há uma URL de redirecionamento salva
+          const redirectUrl = sessionStorage.getItem('redirectAfterLogin')
+          if (redirectUrl) {
+            sessionStorage.removeItem('redirectAfterLogin')
+            window.location.href = redirectUrl
+          } else {
+            router.push("/")
+          }
         }, 1000)
       }
     } catch (error) {
@@ -143,24 +150,28 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-screen bg-white flex overflow-hidden">
-      {/* Left side - Form */}
-      <div className="w-full lg:w-1/2 flex flex-col">
-        <div className="flex-1 flex flex-col justify-center px-6 py-6 lg:px-8 max-h-screen overflow-y-auto">
-          {/* Header with back button */}
-          <div className="mb-6">
-            <Link href="/" className="inline-flex items-center text-gray-600 hover:text-gray-900">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </div>
+    <div className="h-screen bg-white flex overflow-hidden relative">
+      {/* Navbar */}
+       <nav className="absolute top-0 left-0 right-0 z-50 bg-transparent px-6 py-4">
+         <div className="flex items-center">
+           <Link href="/" className="inline-flex items-center text-gray-800 hover:text-gray-600 lg:text-white lg:hover:text-gray-200 transition-colors">
+             <ArrowLeft className="h-5 w-5 mr-2" />
+             <span className="text-sm font-medium">Voltar</span>
+           </Link>
+         </div>
+       </nav>
 
-          {/* Title and subtitle */}
-          <div className="mb-6">
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Bem-vindo de volta</h1>
-            <p className="text-gray-600 text-sm lg:text-base">
-              Entre na sua conta para continuar navegando pelos melhores veículos
-            </p>
-          </div>
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left side - Form */}
+        <div className="w-full lg:w-1/2 flex flex-col">
+          <div className="flex-1 flex flex-col justify-center px-6 pt-20 pb-6 lg:px-8 max-h-screen overflow-y-auto">
+            {/* Title and subtitle */}
+             <div className="mb-6 text-center">
+               <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Bem-vindo de volta</h1>
+               <p className="text-gray-600 text-sm lg:text-base">
+                 Entre na sua conta para continuar navegando pelos melhores veículos
+               </p>
+             </div>
 
           {/* Form */}
           <form onSubmit={handleSignIn} className="space-y-4 max-w-sm mx-auto w-full">
@@ -214,7 +225,7 @@ export default function LoginPage() {
                 <Checkbox
                   id="remember"
                   checked={rememberMe}
-                  onCheckedChange={setRememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
                   className="h-4 w-4 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                   disabled={loading}
                 />
@@ -258,8 +269,8 @@ export default function LoginPage() {
               type="button"
               onClick={handleGoogleSignIn}
               variant="outline"
-              className="w-full h-10 border-gray-200 hover:bg-gray-50 text-gray-700 font-medium text-sm"
-              disabled={loading}
+              className="w-full h-10 border-gray-200 bg-gray-100 text-gray-400 font-medium text-sm cursor-not-allowed"
+              disabled={true}
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -297,11 +308,11 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right side - Image (Desktop only) */}
-      <div className="hidden lg:flex lg:w-1/2 relative">
+        {/* Right side - Image (Desktop only) */}
+        <div className="hidden lg:flex lg:w-1/2 relative">
         <Image
-          src="/images/login-hero.png"
-          alt="Interior luxuoso de carro esportivo"
+          src="https://ecdmpndeunbzhaihabvi.supabase.co/storage/v1/object/public/telas//Mulher%20no%20Showroom%20de%20Carros.png"
+          alt="Mulher no Showroom de Carros"
           fill
           className="object-cover"
           priority
@@ -310,6 +321,7 @@ export default function LoginPage() {
         <div className="absolute bottom-6 right-6 text-white text-right">
           <h2 className="text-2xl font-bold mb-1">Bem-vindo de volta</h2>
           <p className="text-base opacity-90">Continue sua jornada em busca do veículo perfeito</p>
+        </div>
         </div>
       </div>
     </div>

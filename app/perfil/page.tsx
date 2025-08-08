@@ -43,7 +43,7 @@ import {
   type UserProfile,
 } from "@/lib/supabase/profiles"
 import { uploadProfilePhoto, deleteProfilePhoto } from "@/lib/supabase/profile-storage"
-import { UserPaymentsDashboard } from "@/components/user-payments-dashboard"
+// Componente UserPaymentsDashboard removido - sistema de pagamentos desabilitado
 import { 
   formatPhone, 
   formatCep, 
@@ -53,10 +53,15 @@ import {
   validateCep,
   validateCnpj,
   cleanCnpj,
-  formatCnpj
+  formatCnpj,
+  formatCpf,
+  cleanCpf,
+  validateCpf
 } from "@/lib/utils/masks"
 import { AgencyPanelButton } from "@/components/agency-panel-button"
 import { useSearchParams } from "next/navigation"
+import { TrialCounter } from "@/components/trial-counter"
+import { UserPlanDetails } from "@/components/user-plan-details"
 
 interface ViaCepResponse {
   cep: string
@@ -70,6 +75,50 @@ interface ViaCepResponse {
   ddd: string
   siafi: string
   erro?: boolean
+}
+
+// Função para mapear IDs dos planos para nomes legíveis
+const getPlanDisplayName = (planId: string | null | undefined): string => {
+  const planNames: { [key: string]: string } = {
+    'basico': 'Básico',
+    'profissional': 'Profissional', 
+    'empresarial': 'Empresarial',
+    'ilimitado': 'Ilimitado'
+  }
+  
+  if (!planId) return 'Sem Plano'
+  return planNames[planId] || planId // Retorna o próprio valor se não encontrar no mapeamento
+}
+
+const getPlanColors = (planId: string | null | undefined) => {
+  const planColors: { [key: string]: { gradient: string, accent: string, icon: string } } = {
+    'basico': {
+      gradient: 'from-blue-500 via-blue-600 to-indigo-600',
+      accent: 'text-blue-300',
+      icon: 'text-blue-300'
+    },
+    'profissional': {
+      gradient: 'from-purple-500 via-purple-600 to-violet-600', 
+      accent: 'text-purple-300',
+      icon: 'text-purple-300'
+    },
+    'empresarial': {
+      gradient: 'from-gray-700 via-gray-800 to-black',
+      accent: 'text-gray-300',
+      icon: 'text-gray-300'
+    },
+    'ilimitado': {
+      gradient: 'from-yellow-500 via-amber-600 to-orange-600',
+      accent: 'text-yellow-300',
+      icon: 'text-yellow-300'
+    }
+  }
+  
+  return planColors[planId || ''] || {
+    gradient: 'from-green-500 via-green-600 to-emerald-600',
+    accent: 'text-green-300',
+    icon: 'text-green-300'
+  }
 }
 
 export default function PerfilPage() {
@@ -135,6 +184,10 @@ export default function PerfilPage() {
 
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
+
+  const handlePlanosClick = () => {
+    router.push("/planos-publicos")
+  }
 
   useEffect(() => {
     // Mostrar mensagem de erro se foi redirecionado do painel da agência
@@ -279,152 +332,8 @@ export default function PerfilPage() {
       setPendingInvoices(prev => ({ ...prev, loading: true }))
 
       // Buscar customer_id do usuário
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("asaas_customer_id")
-        .eq("id", userId)
-        .single()
-
-      if (profileError) {
-        console.log('⚠️ [PERFIL] Erro ao buscar perfil:', profileError.message)
-        setPendingInvoices({ hasPending: false, count: 0, totalValue: 0, loading: false, hasCustomerId: false })
-        return
-      }
-
-      if (!profile?.asaas_customer_id) {
-        console.log('⚠️ [PERFIL] Usuário não tem customer_id do Asaas')
-        setPendingInvoices({ hasPending: false, count: 0, totalValue: 0, loading: false, hasCustomerId: false })
-        return
-      }
-
-      console.log('🔍 [PERFIL] Buscando pagamentos pendentes no Asaas...')
-      
-      // Adicionar timeout para evitar travamento
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 segundos
-
-      try {
-        console.log("🔑 [DEBUG] process.env.ASAAS_API_KEY:", process.env.ASAAS_API_KEY);
-        const response = await fetch(`/api/asaas/payments/customer/${profile.asaas_customer_id}`, {
-          signal: controller.signal
-        })
-        
-        clearTimeout(timeoutId)
-        
-        if (!response.ok) {
-          console.error("❌ [PERFIL] Erro ao buscar pagamentos:", response.status, response.statusText)
-          
-          // Se for erro 500, pode ser problema de configuração da API
-          if (response.status === 500) {
-            try {
-              const configErrorData = await response.json()
-              if (configErrorData.error?.includes('ASAAS_API_KEY não configurada')) {
-                console.log("⚠️ [PERFIL] API Asaas não configurada corretamente")
-                toast({
-                  variant: "destructive",
-                  title: "Erro de Configuração",
-                  description: "Sistema de pagamentos em manutenção. Verifique o .env e reinicie o servidor.",
-                })
-                setPendingInvoices({ 
-                  hasPending: false, 
-                  count: 0, 
-                  totalValue: 0, 
-                  loading: false, 
-                  hasCustomerId: true 
-                })
-                return
-              }
-            } catch (parseError) {
-              console.log("⚠️ [PERFIL] Não foi possível ler detalhes do erro")
-            }
-          }
-          
-          // Se for erro 401, é problema de autenticação da API
-          if (response.status === 401) {
-            console.log("⚠️ [PERFIL] Erro 401 - API Asaas não autenticada")
-            toast({
-              variant: "destructive",
-              title: "Erro de Autenticação",
-              description: "Sistema de pagamentos em manutenção. Por favor, tente novamente mais tarde.",
-            })
-            setPendingInvoices({ 
-              hasPending: false, 
-              count: 0, 
-              totalValue: 0, 
-              loading: false, 
-              hasCustomerId: true 
-            })
-            return
-          }
-          
-          // Para outros erros, tentar ler o JSON de erro
-          let responseErrorData = { error: "Erro desconhecido" }
-          try {
-            responseErrorData = await response.json()
-          } catch (parseError) {
-            console.log("⚠️ [PERFIL] Não foi possível ler detalhes do erro")
-          }
-          
-          console.log("❌ [PERFIL] Detalhes do erro:", responseErrorData)
-          
-          // Para qualquer erro, apenas log e continua sem quebrar a página
-          setPendingInvoices({ 
-            hasPending: false, 
-            count: 0, 
-            totalValue: 0, 
-            loading: false, 
-            hasCustomerId: true 
-          })
-          return
-        }
-
-        const paymentsData = await response.json()
-        const payments = paymentsData.data || paymentsData || []
-        
-        console.log('📊 [PERFIL] Pagamentos encontrados:', payments.length)
-        
-        // Filtrar apenas pagamentos pendentes ou vencidos
-        const pendingPayments = payments.filter((payment: any) => {
-          const now = new Date()
-          const dueDate = new Date(payment.dueDate)
-          
-          return (
-            payment.status === "PENDING" || 
-            payment.status === "AWAITING_PAYMENT" || 
-            payment.status === "OVERDUE" ||
-            (payment.status === "PENDING" && dueDate < now)
-          )
-        })
-
-        console.log('📊 [PERFIL] Pagamentos pendentes encontrados:', pendingPayments.length)
-        
-        const totalValue = pendingPayments.reduce((sum: number, payment: any) => sum + (payment.value || 0), 0)
-
-        setPendingInvoices({
-          hasPending: pendingPayments.length > 0,
-          count: pendingPayments.length,
-          totalValue: totalValue,
-          loading: false,
-          hasCustomerId: true
-        })
-
-      } catch (fetchError) {
-        clearTimeout(timeoutId)
-        
-        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          console.log("⚠️ [PERFIL] Timeout na requisição para API Asaas")
-        } else {
-          console.error("❌ [PERFIL] Erro na requisição:", fetchError)
-        }
-        
-        setPendingInvoices({ 
-          hasPending: false, 
-          count: 0, 
-          totalValue: 0, 
-          loading: false, 
-          hasCustomerId: true 
-        })
-      }
+      // Função de verificação de pagamentos pendentes removida - sistema Asaas desabilitado
+      setPendingInvoices({ hasPending: false, count: 0, totalValue: 0, loading: false, hasCustomerId: false })
 
     } catch (error) {
       console.error("❌ [PERFIL] Erro geral ao verificar faturas pendentes:", error)
@@ -664,8 +573,9 @@ export default function PerfilPage() {
       return
     }
 
-    // Validar CNPJ para agências
+    // Validar CNPJ e CPF para agências
     if (profileData.tipo_usuario === "agencia") {
+      // Validar CNPJ obrigatório
       const cleanedCnpj = cleanCnpj(profileData.cnpj)
       if (!cleanedCnpj) {
         toast({
@@ -681,6 +591,26 @@ export default function PerfilPage() {
           variant: "destructive",
           title: "CNPJ inválido",
           description: "Digite um CNPJ válido. Ex: 12.345.678/0001-90",
+        })
+        return
+      }
+
+      // Validar CPF obrigatório para agências
+      const cleanedCpf = cleanCpf(profileData.cpf)
+      if (!cleanedCpf) {
+        toast({
+          variant: "destructive",
+          title: "CPF obrigatório",
+          description: "Para cadastro como agência, é necessário informar o CPF do responsável.",
+        })
+        return
+      }
+      // Validar formato do CPF
+      if (!validateCpf(cleanedCpf)) {
+        toast({
+          variant: "destructive",
+          title: "CPF inválido",
+          description: "Digite um CPF válido. Ex: 123.456.789-00",
         })
         return
       }
@@ -714,7 +644,7 @@ export default function PerfilPage() {
 
     try {
       // Verificar se CPF já existe (se foi alterado)
-      const cleanedCpf = cleanPhone(profileData.cpf)
+      const cleanedCpf = cleanCpf(profileData.cpf)
       if (cleanedCpf && cleanedCpf !== profile?.cpf) {
         const cpfExists = await checkCpfExists(cleanedCpf, user.id)
         if (cpfExists) {
@@ -743,60 +673,7 @@ export default function PerfilPage() {
         }
       }
 
-      // Criar ou atualizar customer no Asaas
-      console.log("🔄 [PERFIL] Atualizando customer no Asaas...", {
-        userId: user.id,
-        name: profileData.nome_completo,
-        email: profileData.email,
-        cpfCnpj: cleanedCnpj || cleanedCpf,
-        phone: cleanedPhone,
-        mobilePhone: cleanedPhone
-      })
-
-      const asaasResponse = await fetch("/api/asaas/customers", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          name: profileData.nome_completo,
-          email: profileData.email,
-          cpfCnpj: cleanedCnpj || cleanedCpf || undefined,
-          phone: cleanedPhone,
-          mobilePhone: cleanedPhone,
-          postalCode: cleanedCep || undefined,
-          address: enderecoData.endereco || undefined,
-          addressNumber: enderecoData.numero || undefined,
-          complement: enderecoData.complemento || undefined,
-          province: enderecoData.bairro || undefined,
-          city: enderecoData.cidade || undefined,
-          state: enderecoData.estado || undefined
-        })
-      })
-
-      if (!asaasResponse.ok) {
-        const errorData = await asaasResponse.json()
-        console.error("❌ [PERFIL] Erro ao criar/atualizar customer:", errorData)
-
-        // Tratar erro específico de telefone inválido
-        if (errorData.error === "Número de telefone inválido" || 
-            (errorData.details?.errors && errorData.details.errors.some((e: any) => 
-              e.includes('phone') || e.includes('mobilePhone')))) {
-          toast({
-            variant: "destructive",
-            title: "Telefone inválido",
-            description: errorData.details?.message || 
-                        "O número de telefone deve conter apenas números, com DDD + 8 ou 9 dígitos. Ex: 61912345678",
-          })
-          return
-        }
-
-        throw new Error(errorData.error || "Erro ao criar/atualizar customer no Asaas")
-      }
-
-      const asaasData = await asaasResponse.json()
-      console.log("✅ [PERFIL] Customer atualizado:", asaasData)
+      // Lógica de criação/atualização do customer no Asaas removida - sistema desabilitado
 
       // Salvar perfil
       const updatedProfile = await upsertUserProfile(user.id, {
@@ -841,9 +718,9 @@ export default function PerfilPage() {
         } else if (error.message.includes("Erro ao verificar usuário")) {
           errorTitle = "Erro de Conexão"
           errorMessage = "Problema de conexão com o banco de dados. Tente novamente."
-        } else if (error.message.includes("Asaas")) {
-          errorTitle = "Erro no Asaas"
-          errorMessage = "Não foi possível atualizar seus dados de pagamento. Tente novamente."
+        } else if (error.message.includes("pagamento")) {
+          errorTitle = "Erro no sistema"
+          errorMessage = "Não foi possível processar a solicitação. Tente novamente."
         } else {
           // Usar a mensagem de erro customizada se disponível
           errorMessage = error.message
@@ -900,9 +777,12 @@ export default function PerfilPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-gray-600 hover:text-gray-900">
+          <button 
+            onClick={() => router.back()}
+            className="text-gray-600 hover:text-gray-900"
+          >
             <ArrowLeft className="h-6 w-6" />
-          </Link>
+          </button>
           <h1 className="text-xl font-semibold text-gray-900">Meu Perfil</h1>
           {profile?.perfil_configurado && (
             <div className="ml-auto">
@@ -913,6 +793,11 @@ export default function PerfilPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Trial Counter */}
+        <div className="mb-6">
+          <TrialCounter variant="banner" />
+        </div>
+        
         {/* Layout Grid Responsivo */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
@@ -1013,7 +898,7 @@ export default function PerfilPage() {
 
                   <div>
                     <Label htmlFor="cpf" className="text-sm font-medium text-gray-700">
-                      CPF
+                      CPF {profileData.tipo_usuario === "agencia" && <span className="text-red-500">*</span>}
                     </Label>
                     <Input
                       id="cpf"
@@ -1023,14 +908,20 @@ export default function PerfilPage() {
                       className="mt-1 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                       maxLength={14}
                       placeholder="000.000.000-00"
+                      required={profileData.tipo_usuario === "agencia"}
                     />
-                    <p className="text-xs text-gray-500 mt-1">Obrigatório para vender veículos</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {profileData.tipo_usuario === "agencia" 
+                        ? "Obrigatório para agências" 
+                        : "Obrigatório para vender veículos"
+                      }
+                    </p>
                   </div>
 
                   {profileData.tipo_usuario === "agencia" && (
                     <div className="md:col-span-2">
                       <Label htmlFor="cnpj" className="text-sm font-medium text-gray-700">
-                        CNPJ
+                        CNPJ <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         id="cnpj"
@@ -1040,6 +931,7 @@ export default function PerfilPage() {
                         className="mt-1 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                         maxLength={18}
                         placeholder="00.000.000/0000-00"
+                        required
                       />
                       <p className="text-xs text-gray-500 mt-1">Obrigatório para agências</p>
                     </div>
@@ -1207,6 +1099,22 @@ export default function PerfilPage() {
                     </div>
                   ))}
                 </RadioGroup>
+                
+                {/* Mensagem informativa para agências */}
+                {profileData.tipo_usuario === "agencia" && (
+                  <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-medium text-orange-800 mb-1">Requisitos para Agências</p>
+                        <p className="text-orange-700">
+                          Para cadastrar-se como agência, é obrigatório informar o <strong>CNPJ</strong> e o <strong>CPF do responsável</strong>. 
+                          Estes dados são necessários para validação e emissão de documentos fiscais.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1220,7 +1128,11 @@ export default function PerfilPage() {
                 <p className="text-sm text-gray-600 mb-6">
                   Acompanhe todas as suas cobranças, pagamentos e histórico financeiro.
                 </p>
-                <UserPaymentsDashboard />
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-sm text-gray-600">
+                    Sistema de pagamentos temporariamente desabilitado. Entre em contato conosco para mais informações.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -1355,9 +1267,69 @@ export default function PerfilPage() {
                         <span className="text-xs lg:text-sm text-orange-100">/mês</span>
                       </p>
                     </div>
-                    <Link href="/planos">
-                      <Button className="bg-white text-orange-600 hover:bg-orange-50 font-bold px-4 lg:px-6 py-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 text-sm">
-                        Ver Planos
+                    <Button 
+                      onClick={handlePlanosClick}
+                      className="bg-white text-orange-600 hover:bg-orange-50 font-bold px-4 lg:px-6 py-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 text-sm"
+                    >
+                      Ver Planos
+                      <ArrowRight className="h-3 w-3 lg:h-4 lg:w-4 ml-2" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Plan Status Card - For all user types */}
+            {profileData.tipo_usuario === "comprador" && (
+              <Card className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 border-0 shadow-xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 via-blue-500/20 to-indigo-600/20"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
+
+                <CardContent className="relative p-4 lg:p-6 text-white">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                        <User className="h-5 w-5 lg:h-6 lg:w-6 text-blue-300" />
+                      </div>
+                      <div>
+                        <h3 className="text-base lg:text-lg font-bold">Plano Atual</h3>
+                        <p className="text-blue-100 text-xs lg:text-sm">
+                          {getPlanDisplayName(profile?.plano_atual)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-blue-400 text-blue-900 px-2 py-1 rounded-full text-xs font-bold">
+                      ✅ ATIVO
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-4 lg:mb-6">
+                    <div className="flex items-center gap-2 text-xs lg:text-sm">
+                      <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-blue-300 fill-current" />
+                      <span>Buscar veículos</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs lg:text-sm">
+                      <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-blue-300 fill-current" />
+                      <span>Favoritar anúncios</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs lg:text-sm">
+                      <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-blue-300 fill-current" />
+                      <span>Contatar vendedores</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
+                    <div className="text-center lg:text-left">
+                      <p className="text-blue-100 text-xs">Recursos inclusos</p>
+                      <p className="text-white font-bold text-sm lg:text-base">
+                        <span className="text-blue-300">✅ Acesso completo</span>
+                      </p>
+                    </div>
+                    <Link href="/veiculos">
+                      <Button className="bg-white text-blue-600 hover:bg-blue-50 font-bold px-4 lg:px-6 py-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 text-sm">
+                        <Car className="h-3 w-3 lg:h-4 lg:w-4 mr-2" />
+                        Ver Veículos
                         <ArrowRight className="h-3 w-3 lg:h-4 lg:w-4 ml-2" />
                       </Button>
                     </Link>
@@ -1573,25 +1545,71 @@ export default function PerfilPage() {
               </Card>
             )}
 
+            {/* Plan Details - For agency users */}
+            {profileData.tipo_usuario === "agencia" && (
+              <UserPlanDetails showUpgradeButton={true} compact={false} />
+            )}
+
+            {/* Plan Status Card - For all user types */}
             {profileData.tipo_usuario === "comprador" && (
-              <Card className="bg-blue-50 border-blue-200">
-                <CardContent className="p-4">
-                  <div className="text-center">
-                    <div className="bg-blue-100 w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-3">
-                      <User className="h-5 w-5 text-blue-600" />
+              <Card className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 border-0 shadow-xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 via-blue-500/20 to-indigo-600/20"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
+
+                <CardContent className="relative p-4 lg:p-6 text-white">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                        <User className="h-5 w-5 lg:h-6 lg:w-6 text-blue-300" />
+                      </div>
+                      <div>
+                        <h3 className="text-base lg:text-lg font-bold">Plano Atual</h3>
+                        <p className="text-blue-100 text-xs lg:text-sm">
+                          {getPlanDisplayName(profile?.plano_atual)}
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="font-medium text-gray-900 mb-2">Explorar Veículos</h3>
-                    <p className="text-xs text-gray-600 mb-3">Encontre seu carro ideal</p>
+                    <div className="bg-blue-400 text-blue-900 px-2 py-1 rounded-full text-xs font-bold">
+                      ✅ ATIVO
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-4 lg:mb-6">
+                    <div className="flex items-center gap-2 text-xs lg:text-sm">
+                      <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-blue-300 fill-current" />
+                      <span>Buscar veículos</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs lg:text-sm">
+                      <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-blue-300 fill-current" />
+                      <span>Favoritar anúncios</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs lg:text-sm">
+                      <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-blue-300 fill-current" />
+                      <span>Contatar vendedores</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
+                    <div className="text-center lg:text-left">
+                      <p className="text-blue-100 text-xs">Recursos inclusos</p>
+                      <p className="text-white font-bold text-sm lg:text-base">
+                        <span className="text-blue-300">✅ Acesso completo</span>
+                      </p>
+                    </div>
                     <Link href="/veiculos">
-                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white w-full">
-                        <Car className="h-3 w-3 mr-2" />
+                      <Button className="bg-white text-blue-600 hover:bg-blue-50 font-bold px-4 lg:px-6 py-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 text-sm">
+                        <Car className="h-3 w-3 lg:h-4 lg:w-4 mr-2" />
                         Ver Veículos
+                        <ArrowRight className="h-3 w-3 lg:h-4 lg:w-4 ml-2" />
                       </Button>
                     </Link>
                   </div>
                 </CardContent>
               </Card>
             )}
+
+
 
             {/* Action Buttons - Desktop */}
             <div className="hidden lg:flex flex-col gap-3">

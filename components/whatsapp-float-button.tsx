@@ -106,7 +106,7 @@ export function WhatsAppFloatButton({
           "flex items-center justify-center",
           "focus:outline-none focus:ring-4 focus:ring-green-300/50",
           "transform hover:scale-110 active:scale-95",
-          !isBusinessHours && showBusinessHours ? "animate-pulse" : ""
+          !isBusinessHours && showBusinessHours ? "[animation:pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]" : ""
         )}
         aria-label="Abrir WhatsApp"
         title="Falar no WhatsApp"

@@ -34,8 +34,15 @@ export async function middleware(request: NextRequest) {
     // Refresh session if expired - required for Server Components
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-    // Se não estiver logado, redirecionar para login
-    if (!session) {
+    // Se tentar acessar login ou cadastro estando logado, redirecionar para home
+    if (session && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/cadastro')) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/'
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // Se não estiver logado e tentar acessar páginas protegidas, redirecionar para login
+    if (!session && !['/login', '/cadastro'].includes(request.nextUrl.pathname)) {
       const redirectUrl = request.nextUrl.clone()
       redirectUrl.pathname = '/login'
       redirectUrl.searchParams.set('redirectedFrom', request.nextUrl.pathname)
@@ -48,7 +55,7 @@ export async function middleware(request: NextRequest) {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('tipo_usuario')
-        .eq('id', session.user.id)
+        .eq('id', session?.user?.id ?? '')
         .single()
 
       if (profileError || !profile || profile.tipo_usuario !== 'agencia') {
@@ -72,10 +79,13 @@ export async function middleware(request: NextRequest) {
 // Configurar em quais rotas o middleware será executado
 export const config = {
   matcher: [
+    '/login',
+    '/cadastro',
     '/painel-agencia/:path*',
     '/perfil/:path*',
     '/planos/:path*',
     '/cadastro-veiculo/:path*',
-    '/editar-veiculo/:path*'
+    '/editar-veiculo/:path*',
+    '/meus-veiculos/:path*'
   ]
-} 
+}

@@ -4,45 +4,21 @@ import {
   getBlockableSubscriptions,
   updateSubscriptionStatus,
   renewSubscription,
+  canCreateBillingForUser,
   type UserSubscription 
 } from '@/lib/supabase/subscriptions'
 
-// Função para criar cobrança no Asaas
+// Função de cobrança no Asaas removida - sistema de pagamentos desabilitado
+// async function createAsaasCharge(...) { ... }
+
+// Sistema de pagamentos Asaas foi completamente desabilitado
 async function createAsaasCharge(
   customerId: string, 
   value: number, 
   description: string
 ): Promise<string | null> {
-  try {
-    const response = await fetch(`${process.env.ASAAS_API_URL}/payments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': process.env.ASAAS_API_KEY!,
-      },
-      body: JSON.stringify({
-        customer: customerId,
-        billingType: 'PIX',
-        value: value,
-        dueDate: new Date().toISOString().split('T')[0], // Data atual
-        description: description,
-        externalReference: `subscription_renewal_${Date.now()}`,
-        pixAddressKey: process.env.ASAAS_PIX_KEY
-      })
-    })
-
-    if (!response.ok) {
-      console.error('Erro ao criar cobrança no Asaas:', await response.text())
-      return null
-    }
-
-    const payment = await response.json()
-    return payment.id
-
-  } catch (error) {
-    console.error('Erro na requisição para Asaas:', error)
-    return null
-  }
+  console.log('⚠️ Sistema de pagamentos Asaas desabilitado - cobrança não criada')
+  return null
 }
 
 // POST - Processar cobranças automáticas (chamado por cron job)
@@ -67,29 +43,31 @@ export async function POST(request: NextRequest) {
     
     for (const subscription of expiredSubscriptions) {
       try {
-        if (!subscription.asaas_customer_id) {
-          results.errors.push(`Assinatura ${subscription.id}: customer_id não encontrado`)
+        // Verificação de asaas_customer_id removida - sistema de pagamentos desabilitado
+
+        // Verificar se pode criar cobrança (validação adicional de período de teste)
+        const billingValidation = await canCreateBillingForUser(subscription.user_id)
+        
+        if (!billingValidation.canCreate) {
+          const trialEndDate = billingValidation.trialEndDate
+          const trialEndStr = trialEndDate ? trialEndDate.toLocaleDateString('pt-BR') : 'data não disponível'
+          results.errors.push(`Assinatura ${subscription.id}: ${billingValidation.reason} até ${trialEndStr}`)
           continue
         }
 
-        // Criar cobrança no Asaas
-        const paymentId = await createAsaasCharge(
-          subscription.asaas_customer_id,
-          subscription.plan_value,
-          `Renovação ${subscription.plan_type} - ${new Date().toLocaleDateString('pt-BR')}`
-        )
-
-        if (!paymentId) {
-          results.errors.push(`Assinatura ${subscription.id}: erro ao criar cobrança`)
-          continue
-        }
+        // Criação de cobrança no Asaas desabilitada - sistema de pagamentos removido
+        console.log(`⚠️ Sistema Asaas desabilitado - pulando cobrança para assinatura ${subscription.id}`)
+        
+        // Sistema desabilitado - pular criação de cobrança
+        results.errors.push(`Assinatura ${subscription.id}: sistema de pagamentos desabilitado`)
+        continue
 
         // Renovar assinatura (muda status para pending_payment)
         const renewed = await renewSubscription(subscription.id)
         
         if (renewed) {
           // Atualizar com ID do pagamento
-          await updateSubscriptionStatus(subscription.id, 'pending_payment', paymentId)
+          await updateSubscriptionStatus(subscription.id, 'pending_payment', undefined)
           results.processedExpired++
         } else {
           results.errors.push(`Assinatura ${subscription.id}: erro ao renovar`)
@@ -171,4 +149,4 @@ export async function GET() {
       error: 'Erro interno do servidor' 
     }, { status: 500 })
   }
-} 
+}

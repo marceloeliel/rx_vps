@@ -56,15 +56,12 @@ export function useUserData(options: UseUserDataOptions = {}) {
       
       if (includeProfile) {
         operations.push(
-          supabase.from('profiles').select('*').eq('id', user.id).single()
+          Promise.resolve(supabase.from('profiles').select('*').eq('id', user.id).single())
         )
       }
 
-      if (includePendingPayments) {
-        operations.push(
-          fetch(`/api/asaas/payments/user/${user.id}?email=${encodeURIComponent(user.email)}&status=PENDING`)
-        )
-      }
+      // Lógica de pagamentos pendentes removida - sistema Asaas desabilitado
+      // if (includePendingPayments) { ... }
 
       // 3. Executar operações em paralelo
       const results = await Promise.allSettled(operations)
@@ -83,13 +80,7 @@ export function useUserData(options: UseUserDataOptions = {}) {
         resultIndex++
       }
 
-      if (includePendingPayments) {
-        const paymentsResult = results[resultIndex]
-        if (paymentsResult.status === 'fulfilled' && paymentsResult.value.ok) {
-          const response = paymentsResult.value as Response
-          pendingPayments = await response.json()
-        }
-      }
+      // Processamento de pagamentos pendentes removido - sistema Asaas desabilitado
 
       // 5. Atualizar estados
       setUserData({
@@ -99,10 +90,7 @@ export function useUserData(options: UseUserDataOptions = {}) {
         error: null
       })
 
-      if (includePendingPayments) {
-        setHasPendingPayments(pendingPayments.hasPendingPayments)
-        setPendingPaymentsCount(pendingPayments.pendingPayments)
-      }
+      // Atualização de estados de pagamentos pendentes removida - sistema Asaas desabilitado
 
     } catch (error: any) {
       console.error("Erro ao carregar dados do usuário:", error)
@@ -140,4 +128,4 @@ export function useUserData(options: UseUserDataOptions = {}) {
     refreshUserData,
     isAuthenticated: !!userData.user
   }
-} 
+}

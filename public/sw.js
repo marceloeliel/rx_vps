@@ -1,12 +1,11 @@
-const CACHE_NAME = 'rx-autos-v1';
+const CACHE_NAME = 'rx-autos-v2';
 const urlsToCache = [
   '/',
   '/manifest.json',
   '/veiculos',
   '/planos',
   '/simulador',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
+  // Removendo referências a arquivos estáticos que não existem no Next.js
 ];
 
 // Instalar o service worker
@@ -22,17 +21,25 @@ self.addEventListener('install', (event) => {
 
 // Buscar recursos
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - retorna resposta
-        if (response) {
-          return response;
+  // Não interceptar requisições para arquivos do Next.js
+  if (event.request.url.includes('/_next/')) {
+    return;
+  }
+  
+  // Apenas interceptar requisições para as rotas principais
+  if (urlsToCache.some(url => event.request.url.endsWith(url))) {
+    event.respondWith(
+      caches.match(event.request)
+        .then((response) => {
+          // Cache hit - retorna resposta
+          if (response) {
+            return response;
+          }
+          return fetch(event.request);
         }
-        return fetch(event.request);
-      }
-    )
-  );
+      )
+    );
+  }
 });
 
 // Ativar o service worker
@@ -102,4 +109,4 @@ self.addEventListener('notificationclick', (event) => {
       clients.openWindow('/')
     );
   }
-}); 
+});

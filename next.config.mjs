@@ -70,10 +70,6 @@ const nextConfig = {
       },
     ]
   },
-  // Configurações de compressão
-  compress: true,
-  // Otimizações de build
-  swcMinify: true,
   // Configurações para PWA
   output: 'standalone',
 }

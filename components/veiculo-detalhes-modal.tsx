@@ -38,6 +38,7 @@ import {
 } from "lucide-react"
 import type { Veiculo } from "@/lib/supabase/veiculos"
 import { createClient } from "@/lib/supabase/client"
+import { createLead } from "@/lib/supabase/vehicle-favorites"
 
 interface VeiculoDetalhesModalProps {
   veiculo: Veiculo
@@ -241,6 +242,35 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
     }
   }, [veiculo.user_id, isOpen, supabase, veiculo.id, veiculo.foto_principal, veiculo.fotos])
 
+  // Registrar visualização quando o modal é aberto
+  useEffect(() => {
+    const registerView = async () => {
+      if (!isOpen || !veiculo.id || !veiculo.user_id) return
+      
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError) {
+          console.log('ℹ️ [LEADS] Usuário não autenticado, pulando criação de lead')
+          return
+        }
+        
+        if (user?.id) {
+          // Usar veiculo.user_id como agency_id (referência à tabela profiles)
+          await createLead(user.id, veiculo.id, veiculo.user_id, 'view_details')
+        }
+      } catch (error) {
+        // Silenciar erro para usuários não autenticados
+        console.log('ℹ️ [LEADS] Lead não criado (usuário não autenticado)')
+      }
+    }
+
+    // Só executar quando o modal estiver aberto E veiculo.user_id estiver disponível
+    if (isOpen && veiculo.user_id) {
+      registerView()
+    }
+  }, [isOpen, veiculo.id, dadosAgencia?.id, supabase])
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -263,19 +293,21 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
   }
 
   const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/veiculo/${veiculo.id}`
+    
     if (navigator.share) {
       try {
         await navigator.share({
           title: `${veiculo.marca_nome} ${veiculo.modelo_nome}`,
           text: `Confira este ${veiculo.marca_nome} ${veiculo.modelo_nome} por ${formatPrice(veiculo.preco || 0)}`,
-          url: window.location.href,
+          url: shareUrl,
         })
       } catch (error) {
         console.log("Erro ao compartilhar:", error)
       }
     } else {
       // Fallback para navegadores que não suportam Web Share API
-      navigator.clipboard.writeText(window.location.href)
+      navigator.clipboard.writeText(shareUrl)
       alert("Link copiado para a área de transferência!")
     }
   }
@@ -307,9 +339,40 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
     }
   }
 
+  const handleSimulateFinancing = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      
+      if (!authError && user?.id && veiculo.id && veiculo.user_id) {
+        await createLead(user.id, veiculo.id, veiculo.user_id, 'simulation')
+        console.log('✅ [LEADS] Lead de simulação registrado com sucesso')
+      }
+    } catch (error) {
+      console.log('ℹ️ [LEADS] Lead de simulação não criado (usuário não autenticado)')
+    }
+
+    // Construir URL com parâmetros completos do veículo
+    const params = new URLSearchParams({
+      veiculo: veiculo.id?.toString() || '',
+      marca: veiculo.marca_nome || '',
+      modelo: veiculo.modelo_nome || '',
+      ano: veiculo.ano_fabricacao?.toString() || '',
+      preco: veiculo.preco?.toString() || '0',
+      combustivel: veiculo.combustivel || '',
+      cambio: veiculo.cambio || '',
+      cor: veiculo.cor || '',
+      km: veiculo.quilometragem?.toString() || '0',
+      tipo: veiculo.tipo_veiculo || '',
+      titulo: `${veiculo.marca_nome || ''} ${veiculo.modelo_nome || ''} ${veiculo.ano_fabricacao?.toString() || ''}`
+    } as Record<string, string>)
+    
+    // Abrir simulador em nova aba
+    window.open(`/simulador?${params.toString()}`, '_blank')
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-screen p-0 overflow-y-auto w-[95vw] md:w-full">
+      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] lg:max-w-6xl max-h-[95vh] sm:max-h-screen p-0 overflow-y-auto">
         <div className="flex flex-col">
           {/* Header */}
           <DialogHeader className="p-2 md:p-3 pb-2 border-b sticky top-0 bg-white z-10">
@@ -339,9 +402,9 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
           </DialogHeader>
 
           {/* Conteúdo principal sem ScrollArea */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-2 sm:gap-4 p-2 sm:p-4">
             {/* Coluna Principal - Imagens e Detalhes */}
-            <div className="lg:col-span-3 space-y-4">
+            <div className="lg:col-span-3 space-y-2 sm:space-y-4">
               {/* Galeria de Imagens */}
               <div className="relative">
                 {loadingImagens ? (
@@ -360,6 +423,17 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
                         target.src = "/placeholder.svg?height=400&width=600&text=Erro+ao+carregar"
                       }}
                     />
+                    
+                    {/* Marca d'água */}
+                    <div className="absolute bottom-4 left-4 opacity-25 pointer-events-none">
+                      <Image
+                        src="https://ecdmpndeunbzhaihabvi.supabase.co/storage/v1/object/public/telas//3d%20sem%20fundo.png"
+                        alt="Marca d'água"
+                        width={60}
+                        height={60}
+                        className="object-contain"
+                      />
+                    </div>
 
                     {/* Badges sobre a imagem */}
                     <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -452,18 +526,18 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
 
               {/* Informações Principais */}
               <Card>
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h2 className="text-xl font-bold text-gray-900 mb-1">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-2">
+                    <div className="flex-1">
+                      <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 leading-tight">
                         {veiculo.titulo || `${veiculo.marca_nome} ${veiculo.modelo_nome}`}
                       </h2>
-                      <p className="text-gray-600">
+                      <p className="text-gray-600 text-sm sm:text-base">
                         {veiculo.marca_nome} • {veiculo.modelo_nome}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-orange-600 mb-1">{formatPrice(veiculo.preco || 0)}</div>
+                    <div className="text-left sm:text-right flex-shrink-0">
+                      <div className="text-xl sm:text-2xl font-bold text-orange-600 mb-1">{formatPrice(veiculo.preco || 0)}</div>
                       <div className="flex items-center gap-2 text-sm text-gray-500">
                         <Eye className="h-4 w-4" />
                         <span>1.2k visualizações</span>
@@ -472,7 +546,7 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
                   </div>
 
                   {/* Características Principais */}
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 mb-4">
                     <div className="flex items-center gap-2 text-sm">
                       <Calendar className="h-4 w-4 text-gray-400" />
                       <span className="font-medium">{veiculo.ano_fabricacao}</span>
@@ -596,10 +670,10 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
             </div>
 
             {/* Sidebar - Informações da Agência */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="lg:col-span-2 space-y-2 sm:space-y-4">
               {/* Informações da Agência */}
-              <Card className="sticky top-6">
-                <CardContent className="p-4">
+              <Card className="lg:sticky lg:top-6">
+                <CardContent className="p-3 sm:p-4">
                   {loadingAgencia ? (
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
@@ -661,18 +735,18 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
                       <div className="space-y-2">
                         <Button
                           onClick={() => handleContact("whatsapp")}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white text-sm py-2"
+                          className="w-full bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm py-2"
                         >
-                          <MessageCircle className="h-4 w-4 mr-2" />
+                          <MessageCircle className="h-4 w-4 mr-1 sm:mr-2" />
                           WhatsApp
                         </Button>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" onClick={() => handleContact("phone")} className="flex-1">
-                            <Phone className="h-4 w-4 mr-1" />
+                        <div className="grid grid-cols-2 gap-1 sm:gap-2">
+                          <Button variant="outline" onClick={() => handleContact("phone")} className="flex-1 text-xs sm:text-sm py-2">
+                            <Phone className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                             Ligar
                           </Button>
-                          <Button variant="outline" onClick={() => handleContact("email")} className="flex-1">
-                            <Mail className="h-4 w-4 mr-1" />
+                          <Button variant="outline" onClick={() => handleContact("email")} className="flex-1 text-xs sm:text-sm py-2">
+                            <Mail className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                             Email
                           </Button>
                         </div>
@@ -741,7 +815,7 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
                         {formatPrice(((veiculo.preco || 0) * 0.7 * 1.15) / 48)}
                       </div>
                     </div>
-                    <Button variant="outline" className="w-full">
+                    <Button variant="outline" className="w-full" onClick={handleSimulateFinancing}>
                       Simular Financiamento
                     </Button>
                   </div>

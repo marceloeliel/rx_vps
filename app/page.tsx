@@ -33,6 +33,8 @@ import { VeiculoDetalhesModal } from "@/components/veiculo-detalhes-modal"
 import { LocationBadge } from "@/components/location-badge"
 import PaidAdsSection from "@/components/PaidAdsSection"
 import { useSubscription } from "@/hooks/use-subscription"
+import { TrialCounter } from "@/components/trial-counter"
+// import { TrialDebug } from "@/components/trial-debug"
 
 export default function HomePage() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -173,6 +175,10 @@ export default function HomePage() {
     }
   }
 
+  const handlePlanosClick = () => {
+    router.push("/planos-publicos")
+  }
+
   // Carregar imagens do carrossel
   useEffect(() => {
     const loadCarouselImages = async () => {
@@ -273,6 +279,7 @@ export default function HomePage() {
           <div className="hidden lg:flex items-center gap-3">
             {!loadingUser && user ? (
               <>
+                <TrialCounter variant="badge" className="mr-2" showUpgradeButton={false} />
                 <Link href="/perfil">
                   <Button
                     variant="outline"
@@ -337,6 +344,7 @@ export default function HomePage() {
               <div className="flex flex-col gap-3 pt-4 border-t border-gray-700">
                 {!loadingUser && user ? (
                   <>
+                    <TrialCounter variant="banner" className="mb-2" />
                     <Link href="/perfil">
                       <Button
                         variant="outline"
@@ -502,11 +510,11 @@ export default function HomePage() {
 
                   {/* CTA Button */}
                   <div className="flex justify-center lg:justify-start">
-                    <Link href="/cadastro-agencia">
-                      <Button
-                        size="lg"
-                        className="group relative bg-white text-orange-600 hover:bg-gray-50 font-bold text-base lg:text-lg px-6 lg:px-8 py-3 lg:py-4 rounded-xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 border-0 w-full sm:w-auto"
-                      >
+                    <Button
+                      size="lg"
+                      onClick={handlePlanosClick}
+                      className="group relative bg-white text-orange-600 hover:bg-gray-50 font-bold text-base lg:text-lg px-6 lg:px-8 py-3 lg:py-4 rounded-xl shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 border-0 w-full sm:w-auto"
+                    >
                         <div className="flex items-center gap-2 lg:gap-3">
                           <Building2 className="h-5 w-5 lg:h-6 lg:w-6 group-hover:rotate-12 transition-transform duration-300" />
                           <span className="hidden sm:inline">Começar Teste Gratuito</span>
@@ -519,7 +527,6 @@ export default function HomePage() {
                         {/* Shine Effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                       </Button>
-                    </Link>
                   </div>
 
                   <p className="text-xs lg:text-sm text-white/70 mt-4 text-center lg:text-left">
@@ -646,6 +653,17 @@ export default function HomePage() {
                         target.src = "/placeholder.svg?height=200&width=300&text=Erro+ao+carregar"
                       }}
                     />
+                    
+                    {/* Marca d'água */}
+                    <div className="absolute bottom-1 left-1 opacity-25 pointer-events-none">
+                      <Image
+                        src="https://ecdmpndeunbzhaihabvi.supabase.co/storage/v1/object/public/telas//3d%20sem%20fundo.png"
+                        alt="Marca d'água"
+                        width={20}
+                        height={20}
+                        className="object-contain"
+                      />
+                    </div>
 
                     {/* Badges */}
                     <div className="absolute top-1 left-1 flex flex-col gap-1">
@@ -658,15 +676,7 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* Action buttons */}
-                    <div className="absolute top-1 right-1 flex gap-1">
-                      <Button size="sm" variant="secondary" className="h-5 w-5 p-0 bg-white/80 hover:bg-white">
-                        <Heart className="h-2.5 w-2.5" />
-                      </Button>
-                      <Button size="sm" variant="secondary" className="h-5 w-5 p-0 bg-white/80 hover:bg-white">
-                        <Eye className="h-2.5 w-2.5" />
-                      </Button>
-                    </div>
+
 
                     {/* Video badge if has video */}
                     {veiculo.video && (
@@ -1131,7 +1141,16 @@ export default function HomePage() {
           </div>
 
           <div className="border-t border-gray-700 mt-6 sm:mt-8 pt-6 sm:pt-8 text-center text-sm text-gray-400">
-            <p>© 2025 RX Autos. Todos os direitos reservados.</p>
+            <div className="flex flex-row justify-center items-center gap-4 mb-4">
+              <Link href="/politica-privacidade" className="hover:text-orange-400 transition-colors">
+                Política de Privacidade
+              </Link>
+              <span>•</span>
+              <Link href="/termos-condicoes" className="hover:text-orange-400 transition-colors">
+                Termos e Condições
+              </Link>
+            </div>
+            <p className="text-center">© 2025 RX Autos. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>
@@ -1146,6 +1165,7 @@ export default function HomePage() {
           }}
         />
       )}
+      {/* <TrialDebug /> */}
     </div>
   )
 }

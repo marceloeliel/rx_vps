@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { VeiculoDetalhesModal } from "@/components/veiculo-detalhes-modal"
+import VeiculoCardPublic from "@/components/veiculo-card-public"
 import {
   ArrowLeft,
   ChevronDown,
@@ -237,6 +238,7 @@ export default function VeiculosPage() {
 
   // Componente de filtros reutilizável
   const FiltersContent = () => (
+    <>
     <div className="space-y-4">
       {/* Busca por modelo */}
       <div>
@@ -508,6 +510,7 @@ export default function VeiculosPage() {
         )}
       </div>
     </div>
+    </>
 )
 
   return (
@@ -681,106 +684,14 @@ export default function VeiculosPage() {
                 }`}
               >
                 {vehicles.map((vehicle) => (
-                  <Card key={vehicle.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                    <div className="relative">
-                      <Image
-                        src={vehicle.foto_principal || "/placeholder.svg?height=200&width=300&text=Sem+Foto"}
-                        alt={`${vehicle.marca_nome} ${vehicle.modelo_nome}`}
-                        width={300}
-                        height={200}
-                        className="w-full h-40 sm:h-48 object-cover"
-                        loading="lazy"
-                        priority={false}
-                        onError={(e) => {
-                          // Fallback para imagem padrão em caso de erro
-                          const target = e.target as HTMLImageElement;
-                          target.src = "/placeholder.svg?height=200&width=300&text=Sem+Foto";
-                        }}
-                      />
-                      {getBadgeForVehicle(vehicle) && (
-                        <Badge
-                          className={`absolute top-2 left-2 text-xs ${getBadgeColor(getBadgeForVehicle(vehicle))}`}
-                        >
-                          {getBadgeForVehicle(vehicle)}
-                        </Badge>
-                      )}
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        <Button size="sm" variant="secondary" className="h-7 w-7 p-0">
-                          <Heart className="h-3 w-3" />
-                        </Button>
-                        <Button size="sm" variant="secondary" className="h-7 w-7 p-0">
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      {/* Tipo do veículo badge */}
-                      <div className="absolute bottom-2 left-2">
-                        <Badge variant="secondary" className="bg-orange-500 text-white text-xs flex items-center gap-1">
-                          {getVehicleIcon(vehicle.tipo_veiculo || "carro")}
-                          {getVehicleTypeLabel(vehicle.tipo_veiculo || "carro")}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-bold text-base lg:text-lg text-gray-900 truncate">
-                            {vehicle.marca_nome} {vehicle.modelo_nome}
-                          </h3>
-                          <p className="text-xs sm:text-sm text-gray-600 truncate">{vehicle.titulo}</p>
-                        </div>
-                        <span className="text-orange-500 font-bold text-sm ml-2">{vehicle.ano_fabricacao}</span>
-                      </div>
-
-                      <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
-                        <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
-                          <div className="flex items-center gap-1">
-                            <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span>{vehicle.quilometragem?.toLocaleString() || "0"} km</span>
-                          </div>
-                          {vehicle.combustivel && (
-                            <div className="flex items-center gap-1">
-                              <Fuel className="h-3 w-3 sm:h-4 sm:w-4" />
-                              <span>{vehicle.combustivel}</span>
-                            </div>
-                          )}
-                        </div>
-                        {vehicle.cambio && (
-                          <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
-                            <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
-                            <span>{vehicle.cambio}</span>
-                          </div>
-                        )}
-                        {vehicle.cor && (
-                          <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600">
-                            <div className="h-3 w-3 sm:h-4 sm:w-4 rounded-full border border-gray-300" />
-                            <span>{vehicle.cor}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">
-                        {formatPrice(vehicle.preco)}
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <Button 
-                          onClick={() => handleVerDetalhes(vehicle)}
-                          className="flex-1 bg-orange-500 hover:bg-orange-600 text-sm sm:text-base"
-                        >
-                          Ver oferta
-                        </Button>
-                        <Link href={`/simulador?veiculo=${vehicle.id}&marca=${encodeURIComponent(vehicle.marca_nome || '')}&modelo=${encodeURIComponent(vehicle.modelo_nome || '')}&ano=${vehicle.ano_fabricacao}&preco=${vehicle.preco}&combustivel=${encodeURIComponent(vehicle.combustivel || '')}&cambio=${encodeURIComponent(vehicle.cambio || '')}&cor=${encodeURIComponent(vehicle.cor || '')}&km=${vehicle.quilometragem || 0}&tipo=${vehicle.tipo_veiculo || 'carro'}&titulo=${encodeURIComponent(vehicle.titulo || '')}`}>
-                          <Button 
-                            variant="outline"
-                            className="w-full sm:w-auto border-orange-500 text-orange-500 hover:bg-orange-50 text-sm sm:text-base whitespace-nowrap"
-                          >
-                            Simular
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <VeiculoCardPublic
+                    key={vehicle.id}
+                    veiculo={vehicle}
+                    showFavoriteButton={true}
+                    onFavoriteChange={() => {
+                      // Opcional: recarregar dados se necessário
+                    }}
+                  />
                 ))}
               </div>
             )}

@@ -37,55 +37,33 @@ export async function POST(request: Request) {
 
     console.log("✅ [FORCE-CREATE] Perfil criado:", profileData)
 
-    // 2. Criar customer no Asaas
-    console.log("🌐 [FORCE-CREATE] Criando customer no Asaas...")
+    // 2. Criação de customer no Asaas removida - sistema de pagamentos desabilitado
+    console.log("⚠️ [FORCE-CREATE] Sistema Asaas desabilitado - pulando criação de customer")
     
-    const asaasResponse = await fetch(`${process.env.ASAAS_API_URL}/customers`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "access_token": process.env.ASAAS_API_KEY!,
-      },
-      body: JSON.stringify({
-        name,
-        email,
-        phone,
-        mobilePhone: phone,
-        cpfCnpj: "11144477735", // CPF válido para teste
-      }),
-    })
-
-    if (!asaasResponse.ok) {
-      const errorData = await asaasResponse.json()
-      console.error("❌ [FORCE-CREATE] Erro no Asaas:", errorData)
-      return NextResponse.json({ 
-        error: `Erro no Asaas: ${errorData.errors?.[0]?.description || "Erro desconhecido"}` 
-      }, { status: 500 })
+    // Simular dados do Asaas para manter compatibilidade
+    const asaasData = {
+      id: `disabled_customer_${Date.now()}`,
+      name,
+      email
     }
 
-    const asaasData = await asaasResponse.json()
-    console.log("✅ [FORCE-CREATE] Customer criado no Asaas:", asaasData.id)
-
-    // 3. Atualizar perfil com customer_id
-    console.log("💾 [FORCE-CREATE] Atualizando perfil com customer_id...")
+    // 3. Atualização do customer_id removida - sistema Asaas desabilitado
+    console.log("⚠️ [FORCE-CREATE] Sistema Asaas desabilitado - pulando atualização de customer_id")
     
+    // Buscar perfil existente para retornar
     const { data: updatedProfile, error: updateError } = await supabase
       .from("profiles")
-      .update({
-        asaas_customer_id: asaasData.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId)
       .select("*")
+      .eq("id", userId)
 
     if (updateError) {
-      console.error("❌ [FORCE-CREATE] Erro ao atualizar customer_id:", updateError)
+      console.error("❌ [FORCE-CREATE] Erro ao buscar perfil:", updateError)
       return NextResponse.json({ 
-        error: `Erro ao atualizar customer_id: ${updateError.message}` 
+        error: `Erro ao buscar perfil: ${updateError.message}` 
       }, { status: 500 })
     }
 
-    console.log("✅ [FORCE-CREATE] Perfil atualizado com customer_id:", updatedProfile)
+    console.log("✅ [FORCE-CREATE] Perfil encontrado:", updatedProfile)
 
     return NextResponse.json({
       success: true,
@@ -100,4 +78,4 @@ export async function POST(request: Request) {
       error: `Erro inesperado: ${error.message}` 
     }, { status: 500 })
   }
-} 
+}

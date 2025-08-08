@@ -7,6 +7,7 @@ import {
   updateSubscriptionStatus,
   checkUserAccess,
   PLAN_CONFIGS,
+  // createSubscriptionWithInitialFreePeriod removido - sistema Asaas desabilitado
   type UserSubscription
 } from '@/lib/supabase/subscriptions'
 import { createTrialPeriod, checkTrialPeriod } from '@/lib/supabase/trial'
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, planType, asaasCustomerId, startTrial = false } = body
+    const { userId, planType, startTrial = false, useFreePeriod = false } = body
 
     if (!userId || !planType) {
       return NextResponse.json({ 
@@ -59,20 +60,37 @@ export async function POST(request: NextRequest) {
 
     if (!PLAN_CONFIGS[planType as keyof typeof PLAN_CONFIGS]) {
       return NextResponse.json({ 
-        error: 'Plano inválido. Opções: basico, premium, premium_plus' 
+        error: 'Plano inválido. Opções: basico, premium, premium_plus, ilimitado' 
       }, { status: 400 })
     }
 
     // Verificar se já existe assinatura ativa
     const existingSubscription = await getUserActiveSubscription(userId)
     if (existingSubscription) {
-      return NextResponse.json({ 
-        error: 'Usuário já possui uma assinatura ativa',
-        subscription: existingSubscription
-      }, { status: 409 })
+      // Se for uma tentativa de mudança de plano, verificar se já fez o primeiro pagamento
+      if (existingSubscription.plan_type !== planType) {
+        // Verificar se a assinatura atual foi criada com período gratuito e ainda não foi cobrada
+        const subscriptionAge = new Date().getTime() - new Date(existingSubscription.created_at).getTime()
+        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000
+        
+        // Se a assinatura tem menos de 30 dias e não tem pagamento registrado, bloquear mudança
+        if (subscriptionAge < thirtyDaysInMs && !existingSubscription.last_payment_id) {
+          return NextResponse.json({ 
+            error: 'Você só pode alterar seu plano após o primeiro pagamento. Aguarde o fim do período gratuito ou entre em contato com o suporte.',
+            subscription: existingSubscription,
+            canChangePlan: false,
+            daysUntilFirstPayment: Math.ceil((thirtyDaysInMs - subscriptionAge) / (24 * 60 * 60 * 1000))
+          }, { status: 409 })
+        }
+      } else {
+        return NextResponse.json({ 
+          error: 'Usuário já possui uma assinatura ativa do mesmo plano',
+          subscription: existingSubscription
+        }, { status: 409 })
+      }
     }
 
-    // Se solicitado período de teste
+    // Se solicitado período de teste (sistema antigo)
     if (startTrial) {
       // Verificar se usuário já teve período de teste
       const trialStatus = await checkTrialPeriod(userId)
@@ -84,7 +102,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Criar período de teste
-      const trialPeriod = await createTrialPeriod(userId, planType as keyof typeof PLAN_CONFIGS)
+      const trialPeriod = await createTrialPeriod(userId, planType as 'basico' | 'premium' | 'premium_plus')
       if (!trialPeriod) {
         return NextResponse.json({
           error: 'Erro ao criar período de teste'
@@ -97,19 +115,27 @@ export async function POST(request: NextRequest) {
       }, { status: 201 })
     }
 
-    // Se não for trial, criar assinatura normal
-    const subscription = await createSubscription(userId, planType, asaasCustomerId)
-
-    if (!subscription) {
+    // Sistema de pagamentos desabilitado - retornar erro informativo
+    if (useFreePeriod) {
       return NextResponse.json({ 
-        error: 'Erro ao criar assinatura' 
-      }, { status: 500 })
+        error: 'Sistema de pagamentos temporariamente desabilitado. Entre em contato com o suporte.' 
+      }, { status: 503 })
     }
 
-    return NextResponse.json({
-      message: 'Assinatura criada com sucesso',
-      subscription
-    }, { status: 201 })
+    // Verificar se usuário está em período de teste antes de criar assinatura paga
+    const trialStatus = await checkTrialPeriod(userId)
+    if (trialStatus.isInTrial) {
+      return NextResponse.json({
+        error: 'Usuário ainda está em período de teste gratuito. Aguarde o término do período de teste para criar uma assinatura paga.',
+        trialPeriod: trialStatus.trialPeriod,
+        daysRemaining: trialStatus.daysRemaining
+      }, { status: 409 })
+    }
+
+    // Sistema de pagamentos desabilitado - retornar erro informativo
+    return NextResponse.json({ 
+      error: 'Sistema de pagamentos temporariamente desabilitado. Entre em contato com o suporte.' 
+    }, { status: 503 })
 
   } catch (error) {
     console.error('Erro ao criar assinatura:', error)
@@ -152,4 +178,4 @@ export async function PUT(request: NextRequest) {
     console.error('Erro ao atualizar assinatura:', error)
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
-} 
+}

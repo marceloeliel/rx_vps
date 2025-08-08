@@ -219,6 +219,12 @@ export default function SimuladorPage() {
         
         if (error) {
           console.error("❌ [SIMULADOR] Erro ao buscar usuário:", error)
+          // Se for erro de sessão ausente, redirecionar para página de login
+          if (error.message?.includes('Auth session missing')) {
+            console.log("🔄 [SIMULADOR] Sessão ausente, redirecionando para página de login")
+            router.push("/login")
+            return
+          }
           return
         }
         
@@ -282,9 +288,18 @@ export default function SimuladorPage() {
           }
         } else {
           console.log("ℹ️ [SIMULADOR] Usuário não está logado")
+          // Redirecionar para a página de login se não estiver logado
+          router.push("/login")
+          return
         }
       } catch (error) {
         console.error("❌ [SIMULADOR] Erro ao carregar usuário:", error)
+        // Se for erro de sessão ausente, redirecionar para página de login
+         if (error instanceof Error && error.message?.includes('Auth session missing')) {
+           console.log("🔄 [SIMULADOR] Sessão ausente, redirecionando para página de login")
+           router.push("/login")
+           return
+         }
       } finally {
         setLoadingUserData(false)
         console.log("✅ [SIMULADOR] Carregamento do usuário finalizado")
@@ -1269,10 +1284,10 @@ export default function SimuladorPage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => router.back()}>
+              <Button variant="ghost" size="sm" onClick={() => window.close()}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <span className="text-xl font-bold text-gray-900">Simulador RX</span>
+              <span className="text-xl font-bold text-gray-900">Sair</span>
             </div>
             
             {/* Progress indicator for mobile */}
@@ -1282,7 +1297,7 @@ export default function SimuladorPage() {
               </span>
               <div className="w-16 bg-gray-200 rounded-full h-2">
                 <div 
-                  className="bg-orange-500 h-2 rounded-full transition-all duration-300" 
+                  className="h-2 rounded-full transition-all duration-300 bg-orange-500"
                   style={{ width: `${(currentStep / 4) * 100}%` }}
                 ></div>
               </div>
@@ -1479,4 +1494,4 @@ export default function SimuladorPage() {
       </div>
     </div>
   )
-} 
+}

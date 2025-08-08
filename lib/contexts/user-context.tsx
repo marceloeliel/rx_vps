@@ -12,7 +12,7 @@ interface UserProfile {
   plano_atual?: string
   plano_data_inicio?: string
   plano_data_fim?: string
-  asaas_customer_id?: string
+  // asaas_customer_id removido - sistema de pagamentos desabilitado
   [key: string]: any
 }
 
@@ -129,4 +129,4 @@ export function useUser() {
     throw new Error("useUser deve ser usado dentro de um UserProvider")
   }
   return context
-} 
+}

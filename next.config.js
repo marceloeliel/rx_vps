@@ -1,24 +1,48 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   images: {
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'rxautos.com.br',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'https',
+        hostname: 's2-autoesporte.glbimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.s3.glbimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.autopapo.com.br',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.bstr.es',
       }
-    ],
-    domains: [
-      'images.unsplash.com',
-      'via.placeholder.com',
-      'placehold.co',
-      'rxautos.com.br',
-      'localhost',
-      's2-autoesporte.glbimg.com',
-      'i.s3.glbimg.com',
-      'cdn.autopapo.com.br',
-      'i.bstr.es'
     ],
   },
   async rewrites() {
@@ -31,4 +55,4 @@ const nextConfig = {
   }
 }
 
-module.exports = nextConfig 
+module.exports = nextConfig

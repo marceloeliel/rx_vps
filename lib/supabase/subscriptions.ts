@@ -11,7 +11,7 @@ export interface UserSubscription {
   end_date: string
   status: 'active' | 'pending_payment' | 'blocked' | 'cancelled'
   last_payment_id?: string
-  asaas_customer_id?: string
+  // asaas_customer_id removido - sistema de pagamentos desabilitado
   grace_period_ends_at?: string
   created_at: string
   updated_at: string
@@ -54,8 +54,41 @@ export async function getUserActiveSubscription(userId: string): Promise<UserSub
 export async function createSubscription(
   userId: string, 
   planType: keyof PlanConfig,
-  asaasCustomerId?: string
+  // asaasCustomerId removido - sistema de pagamentos desabilitado
+  skipTrialCheck: boolean = false
 ): Promise<UserSubscription | null> {
+  // Verificar se usuário está em período de teste (a menos que seja explicitamente ignorado)
+  if (!skipTrialCheck) {
+    try {
+      const { data: trialData } = await supabase
+        .from('trial_periods')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('converted_to_paid', false)
+        .single()
+
+      if (trialData) {
+        const trialEndDate = new Date(trialData.end_date)
+        const currentDate = new Date()
+        
+        // Se ainda está em período de teste, não criar assinatura paga
+        if (currentDate < trialEndDate) {
+          console.log(`Usuário ${userId} ainda está em período de teste até ${trialEndDate.toLocaleDateString('pt-BR')}. Assinatura paga não será criada.`)
+          return null
+        }
+        
+        // Se o período de teste expirou, marcar como convertido
+        await supabase
+          .from('trial_periods')
+          .update({ converted_to_paid: true })
+          .eq('id', trialData.id)
+      }
+    } catch (error) {
+      // Se houver erro ao verificar trial, continuar com criação normal
+      console.error(`Erro ao verificar período de teste para usuário ${userId}:`, error)
+    }
+  }
+
   const planConfig = PLAN_CONFIGS[planType]
   const startDate = new Date()
   const endDate = new Date(startDate.getTime() + (30 * 24 * 60 * 60 * 1000)) // 30 dias
@@ -69,7 +102,7 @@ export async function createSubscription(
       start_date: startDate.toISOString(),
       end_date: endDate.toISOString(),
       status: 'active',
-      asaas_customer_id: asaasCustomerId
+      // asaas_customer_id removido - sistema de pagamentos desabilitado
     })
     .select()
     .single()
@@ -227,7 +260,44 @@ export async function getExpiredSubscriptions(): Promise<UserSubscription[]> {
     return []
   }
 
-  return data || []
+  if (!data) return []
+
+  // Filtrar assinaturas que não estão em período de teste
+  const filteredSubscriptions = []
+  
+  for (const subscription of data) {
+    try {
+      // Verificar se o usuário está em período de teste
+      const { data: trialData } = await supabase
+        .from('trial_periods')
+        .select('*')
+        .eq('user_id', subscription.user_id)
+        .eq('converted_to_paid', false)
+        .single()
+
+      // Se há período de teste ativo, verificar se ainda está válido
+      if (trialData) {
+        const trialEndDate = new Date(trialData.end_date)
+        const currentDate = new Date()
+        
+        // Se o período de teste ainda está ativo, não incluir na lista de expiradas
+        if (currentDate < trialEndDate) {
+          console.log(`Usuário ${subscription.user_id} ainda está em período de teste até ${trialEndDate.toLocaleDateString('pt-BR')}. Cobrança não será criada.`)
+          continue
+        }
+      }
+      
+      // Se não está em período de teste ou o teste expirou, incluir na lista
+      filteredSubscriptions.push(subscription)
+      
+    } catch (error) {
+      // Se houver erro ao verificar trial, incluir a assinatura (comportamento padrão)
+      console.error(`Erro ao verificar período de teste para usuário ${subscription.user_id}:`, error)
+      filteredSubscriptions.push(subscription)
+    }
+  }
+
+  return filteredSubscriptions
 }
 
 // Buscar assinaturas que excederam período de tolerância
@@ -247,4 +317,51 @@ export async function getBlockableSubscriptions(): Promise<UserSubscription[]> {
   }
 
   return data || []
-} 
+}
+
+// Verificar se uma cobrança pode ser criada para o usuário (considerando período de teste)
+export async function canCreateBillingForUser(userId: string): Promise<{
+  canCreate: boolean
+  reason?: string
+  trialEndDate?: Date
+}> {
+  try {
+    // Verificar se o usuário está em período de teste
+    const { data: trialData } = await supabase
+      .from('trial_periods')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('converted_to_paid', false)
+      .single()
+
+    if (trialData) {
+      const trialEndDate = new Date(trialData.end_date)
+      const currentDate = new Date()
+      
+      // Se ainda está em período de teste, não pode criar cobrança
+      if (currentDate < trialEndDate) {
+        return {
+          canCreate: false,
+          reason: `Usuário ainda está em período de teste gratuito`,
+          trialEndDate
+        }
+      }
+    }
+    
+    // Se não está em período de teste ou o teste expirou, pode criar cobrança
+    return {
+      canCreate: true
+    }
+    
+  } catch (error) {
+    // Se houver erro ao verificar trial, permitir criação (comportamento padrão)
+    console.error(`Erro ao verificar período de teste para usuário ${userId}:`, error)
+    return {
+      canCreate: true,
+      reason: 'Erro ao verificar período de teste, permitindo cobrança por segurança'
+    }
+  }
+}
+
+// Criar assinatura com cobrança inicial de R$ 0,00 e próxima cobrança no valor real
+// Função createSubscriptionWithInitialFreePeriod removida - sistema de pagamentos Asaas desabilitado

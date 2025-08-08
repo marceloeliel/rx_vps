@@ -1,4 +1,5 @@
 import { createClient } from './client'
+import { createLead } from './vehicle-favorites'
 
 // Interface para os dados da simulação
 export interface SimulacaoData {
@@ -161,6 +162,26 @@ export async function salvarSimulacao(dados: SimulacaoData): Promise<{ data: Sim
     }
 
     console.log('✅ [SIMULACAO] Simulação salva com sucesso:', data.id)
+    
+    // Se há um veículo específico, criar lead no painel da agência
+    if (dados.veiculoId) {
+      try {
+        // Buscar dados do veículo para obter o user_id da agência
+        const { data: veiculo, error: veiculoError } = await supabase
+          .from('veiculos')
+          .select('user_id')
+          .eq('id', dados.veiculoId)
+          .single()
+        
+        if (!veiculoError && veiculo?.user_id) {
+          await createLead(user.id, dados.veiculoId, veiculo.user_id, 'simulation')
+          console.log('✅ [SIMULACAO] Lead criado no painel da agência para veículo:', dados.veiculoId)
+        }
+      } catch (leadError) {
+        console.log('ℹ️ [SIMULACAO] Não foi possível criar lead no painel da agência:', leadError)
+      }
+    }
+    
     return { data, error: null }
 
   } catch (error: any) {
@@ -269,4 +290,4 @@ export async function deletarSimulacao(id: string): Promise<{ success: boolean, 
     console.error('❌ [SIMULACAO] Erro inesperado ao deletar:', error)
     return { success: false, error: error.message || 'Erro inesperado ao deletar simulação' }
   }
-} 
+}

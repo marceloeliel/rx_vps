@@ -125,7 +125,14 @@ export default function CadastroPage() {
 
         // Aguardar um pouco para o usuário ver a mensagem
         setTimeout(() => {
-          router.push("/login")
+          // Verificar se há uma URL de redirecionamento salva para preservar no login
+          const redirectUrl = sessionStorage.getItem('redirectAfterLogin')
+          if (redirectUrl) {
+            // Manter a URL salva para após o login
+            router.push("/login")
+          } else {
+            router.push("/login")
+          }
         }, 2000)
       }
     } catch (error) {
@@ -174,19 +181,24 @@ export default function CadastroPage() {
   }
 
   return (
-    <div className="h-screen bg-white flex overflow-hidden">
-      {/* Left side - Form */}
-      <div className="w-full lg:w-1/2 flex flex-col overflow-hidden">
-        <div className="flex-1 flex flex-col justify-center px-6 py-4 lg:px-8">
-          {/* Header with back button */}
-          <div className="mb-4">
-            <Link href="/" className="inline-flex items-center text-gray-600 hover:text-gray-900">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </div>
+    <div className="h-screen bg-white flex overflow-hidden relative">
+      {/* Navbar */}
+      <nav className="absolute top-0 left-0 right-0 z-50 bg-transparent px-6 py-4">
+        <div className="flex items-center">
+          <Link href="/" className="inline-flex items-center text-gray-800 hover:text-gray-600 lg:text-white lg:hover:text-gray-200 transition-colors">
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            <span className="text-sm font-medium">Voltar</span>
+          </Link>
+        </div>
+      </nav>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left side - Form */}
+        <div className="w-full lg:w-1/2 flex flex-col">
+          <div className="flex-1 flex flex-col justify-center px-6 pt-20 pb-6 lg:px-8 max-h-screen overflow-y-auto">
 
           {/* Title and subtitle */}
-          <div className="mb-4">
+          <div className="mb-4 text-center">
             <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-1">Crie sua conta</h1>
             <p className="text-gray-600 text-sm">Cadastre-se para encontrar e comprar o veículo dos seus sonhos</p>
           </div>
@@ -288,7 +300,7 @@ export default function CadastroPage() {
               <Checkbox
                 id="terms"
                 checked={acceptTerms}
-                onCheckedChange={setAcceptTerms}
+                onCheckedChange={(checked) => setAcceptTerms(checked === true)}
                 className="mt-0.5 h-3.5 w-3.5 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                 disabled={loading}
               />
@@ -335,8 +347,8 @@ export default function CadastroPage() {
               type="button"
               onClick={handleGoogleSignUp}
               variant="outline"
-              className="w-full h-9 border-gray-200 hover:bg-gray-50 text-gray-700 font-medium text-sm"
-              disabled={loading}
+              className="w-full h-9 border-gray-200 bg-gray-100 text-gray-400 font-medium text-sm cursor-not-allowed"
+              disabled={true}
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -371,14 +383,14 @@ export default function CadastroPage() {
               </Link>
             </div>
           </form>
+          </div>
         </div>
-      </div>
 
-      {/* Right side - Image (Desktop only) */}
-      <div className="hidden lg:flex lg:w-1/2 relative">
+        {/* Right side - Image (Desktop only) */}
+        <div className="hidden lg:flex lg:w-1/2 relative">
         <Image
-          src="/images/signup-hero.png"
-          alt="Carros de luxo em showroom moderno"
+          src="https://ecdmpndeunbzhaihabvi.supabase.co/storage/v1/object/public/telas//Toyota%20Corolla%20em%20Showroom%20Moderno.png"
+          alt="Toyota Corolla em showroom moderno"
           fill
           className="object-cover"
           priority
@@ -387,6 +399,7 @@ export default function CadastroPage() {
         <div className="absolute bottom-6 right-6 text-white text-right">
           <h2 className="text-2xl font-bold mb-1">Encontre seu carro dos sonhos</h2>
           <p className="text-base opacity-90">Milhares de veículos verificados esperando por você</p>
+        </div>
         </div>
       </div>
     </div>

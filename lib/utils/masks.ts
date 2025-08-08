@@ -150,4 +150,66 @@ export function validateCnpj(value: string): boolean {
 
   console.log("✅ [VALIDATE-CNPJ] CNPJ válido:", numbers)
   return true
-} 
+}
+
+// Função para limpar CPF (remover tudo exceto números)
+export function cleanCpf(value: string): string {
+  return value.replace(/\D/g, "")
+}
+
+// Função para formatar CPF
+export function formatCpf(value: string): string {
+  const numbers = cleanCpf(value)
+  
+  if (numbers.length <= 3) return numbers
+  if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`
+  if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`
+  if (numbers.length <= 11) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9)}`
+  return numbers
+}
+
+// Função para validar CPF
+export function validateCpf(value: string): boolean {
+  const numbers = cleanCpf(value)
+  
+  // Deve ter 11 dígitos
+  if (numbers.length !== 11) {
+    console.log("❌ [VALIDATE-CPF] Comprimento inválido:", numbers.length)
+    return false
+  }
+
+  // Verificar se todos os dígitos são iguais
+  if (/^(\d)\1+$/.test(numbers)) {
+    console.log("❌ [VALIDATE-CPF] Dígitos repetidos:", numbers)
+    return false
+  }
+
+  // Validar primeiro dígito verificador
+  let soma = 0
+  for (let i = 0; i < 9; i++) {
+    soma += parseInt(numbers[i]) * (10 - i)
+  }
+  let resto = soma % 11
+  let digito1 = resto < 2 ? 0 : 11 - resto
+  
+  if (digito1 !== parseInt(numbers[9])) {
+    console.log("❌ [VALIDATE-CPF] Primeiro dígito verificador inválido")
+    return false
+  }
+
+  // Validar segundo dígito verificador
+  soma = 0
+  for (let i = 0; i < 10; i++) {
+    soma += parseInt(numbers[i]) * (11 - i)
+  }
+  resto = soma % 11
+  let digito2 = resto < 2 ? 0 : 11 - resto
+  
+  if (digito2 !== parseInt(numbers[10])) {
+    console.log("❌ [VALIDATE-CPF] Segundo dígito verificador inválido")
+    return false
+  }
+
+  console.log("✅ [VALIDATE-CPF] CPF válido:", numbers)
+  return true
+}

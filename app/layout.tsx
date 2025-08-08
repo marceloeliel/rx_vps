@@ -5,6 +5,7 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "@/components/providers"
 import { WhatsAppFloatButton } from "@/components/whatsapp-float-button"
+import { TrialNotificationBar } from "@/components/trial-notification-bar"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -83,7 +84,13 @@ export default function RootLayout({
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
         <Providers>
-          {children}
+          <div className="flex flex-col min-h-screen">
+            <TrialNotificationBar />
+            <main className="flex-grow">
+              {children}
+            </main>
+
+          </div>
         </Providers>
         <Toaster />
         <WhatsAppFloatButton />
@@ -93,14 +100,28 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                      console.log('SW registered: ', registration);
-                    })
-                    .catch(function(registrationError) {
-                      console.log('SW registration failed: ', registrationError);
-                    });
+                window.addEventListener('load', async function() {
+                  try {
+                    // Limpar caches antigos para evitar problemas
+                    if (window.caches) {
+                      const cacheKeys = await caches.keys();
+                      await Promise.all(
+                        cacheKeys.map(cacheName => caches.delete(cacheName))
+                      );
+                    }
+                    
+                    // Desregistrar service workers antigos
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(
+                      registrations.map(registration => registration.unregister())
+                    );
+                    
+                    // Registrar novo service worker
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    console.log('SW registered: ', registration);
+                  } catch (error) {
+                    console.log('SW registration failed: ', error);
+                  }
                 });
               }
             `,

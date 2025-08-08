@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Star, MapPin, Clock, Users, TrendingUp, Phone, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Star, MapPin, Clock, Users, TrendingUp, Phone, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getActivePaidAds, type PaidAd } from '@/lib/supabase/paid-ads'
 
 interface PaidAdsSectionProps {
@@ -222,7 +222,7 @@ export default function PaidAdsSection({ maxAds = 10, showTitle = true }: PaidAd
 
                            {/* Action Buttons */}
                            <div className="flex gap-3 md:gap-4">
-                             <button 
+                             <button
                                onClick={() => {
                                  // Usar WhatsApp da agência se disponível, senão usar o número da RX
                                  const telefone = ad.agencia_whatsapp || ad.agencia_telefone || '5573999377300'
@@ -230,7 +230,7 @@ export default function PaidAdsSection({ maxAds = 10, showTitle = true }: PaidAd
                                  const whatsappUrl = `https://wa.me/${telefone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
                                  window.open(whatsappUrl, '_blank')
                                }}
-                               className="group relative flex-1 px-4 md:px-6 py-3 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 overflow-hidden text-base"
+                               className={`group relative flex-1 px-4 md:px-6 py-3 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 overflow-hidden text-base contact-button-${ad.id}`}
                                style={{ backgroundColor: ad.primary_color }}
                              >
                                <div className="flex items-center justify-center gap-2">
@@ -240,22 +240,7 @@ export default function PaidAdsSection({ maxAds = 10, showTitle = true }: PaidAd
                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                              </button>
 
-                             <button 
-                               onClick={() => {
-                                 // Direcionar para página de veículos filtrada pela agência
-                                 if (ad.agencia_user_id) {
-                                   window.location.href = `/veiculos?agencia=${ad.agencia_user_id}`
-                                 } else {
-                                   window.location.href = '/veiculos'
-                                 }
-                               }}
-                               className="group relative flex-1 px-4 md:px-6 py-3 bg-white/10 backdrop-blur-sm text-white font-semibold rounded-lg border border-white/30 hover:bg-white/20 transition-all duration-300 transform hover:scale-105 text-base"
-                             >
-                               <div className="flex items-center justify-center gap-2">
-                                 <Eye size={18} />
-                                 <span>Ver Estoque</span>
-                               </div>
-                             </button>
+
                            </div>
                          </div>
                        </div>
@@ -362,16 +347,6 @@ export default function PaidAdsSection({ maxAds = 10, showTitle = true }: PaidAd
                   </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
                 </button>
-                
-                <button 
-                  onClick={() => {
-                    window.location.href = '/planos'
-                  }}
-                  className="bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200 px-6 py-3 text-sm font-semibold transition-all duration-300 transform hover:scale-105 rounded-lg flex items-center justify-center gap-2"
-                >
-                  <Eye size={16} />
-                  Ver Planos
-                </button>
               </div>
             </div>
           </div>
@@ -379,4 +354,4 @@ export default function PaidAdsSection({ maxAds = 10, showTitle = true }: PaidAd
       )}
     </div>
   )
-} 
+}

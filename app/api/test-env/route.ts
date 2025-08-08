@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const asaasKey = "$aact_YTU5YTE0M2M2N2I4MTliNzk0YTI5N2U5MzdjNWZmNDQ6OjAwMDAwMDAwMDAwMDAwNzI4MzQ6OiRhYWNoX2Y0NzJkNzRhLTUxYjctNGM4Yy1iMzEyLTEzZGQ1Y2JkYjE3Ng==" // Teste com token hardcoded
+    // Sistema Asaas foi completamente desabilitado
+    console.log('⚠️ [TEST-ENV] Sistema Asaas desabilitado')
     
     return NextResponse.json({
-      hasKey: !!asaasKey,
-      keyLength: asaasKey?.length || 0,
-      keyStart: asaasKey?.substring(0, 10) || "N/A",
-      allEnvKeys: Object.keys(process.env).filter(key => key.includes('ASAAS')),
-      tokenTest: "hardcoded"
+      message: 'Sistema de pagamentos Asaas foi desabilitado',
+      hasKey: false,
+      keyLength: 0,
+      keyStart: 'DISABLED',
+      allEnvKeys: [],
+      tokenTest: 'SYSTEM_DISABLED'
     })
   } catch (error) {
     return NextResponse.json(
@@ -17,4 +19,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-} 
+}

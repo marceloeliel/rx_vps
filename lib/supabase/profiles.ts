@@ -25,7 +25,7 @@ export interface UserProfile {
   plano_data_fim?: string
   plano_data_inicio?: string
   plano_payment_id?: string
-  asaas_customer_id?: string
+  // asaas_customer_id removido - sistema de pagamentos desabilitado
 }
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
@@ -292,47 +292,5 @@ export async function upsertUserProfile(
   }
 }
 
-// Funções Asaas Customer ID
-export async function saveAsaasCustomerId(userId: string, customerId: string): Promise<boolean> {
-  const supabase = createClient()
-
-  try {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ asaas_customer_id: customerId })
-      .eq("id", userId)
-
-    if (error) {
-      console.error("❌ [PROFILES] Erro ao salvar customer ID:", error)
-      return false
-    }
-
-    console.log("✅ [PROFILES] Customer ID salvo:", customerId)
-    return true
-  } catch (error) {
-    console.error("❌ [PROFILES] Erro inesperado:", error)
-    return false
-  }
-}
-
-export async function getAsaasCustomerId(userId: string): Promise<string | null> {
-  const supabase = createClient()
-
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("asaas_customer_id")
-      .eq("id", userId)
-      .single()
-
-    if (error) {
-      console.error("❌ [PROFILES] Erro ao buscar customer ID:", error)
-      return null
-    }
-
-    return data?.asaas_customer_id || null
-  } catch (error) {
-    console.error("❌ [PROFILES] Erro inesperado:", error)
-    return null
-  }
-}
+// Funções Asaas removidas - sistema de pagamentos desabilitado
+// saveAsaasCustomerId e getAsaasCustomerId foram removidas
