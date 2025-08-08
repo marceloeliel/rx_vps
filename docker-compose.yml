@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Aplicação RX Veículos
   rx-veiculos:
     build:
       context: .
@@ -29,33 +28,10 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
       WEBSITE_URL: ${WEBSITE_URL}
     restart: unless-stopped
+    # Se a imagem base não tiver curl, troque o healthcheck (ou remova temporariamente)
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - rx-network
-
-  # Nginx Reverse Proxy (opcional)
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - rx-veiculos
-    restart: unless-stopped
-    networks:
-      - rx-network
-
-networks:
-  rx-network:
-    driver: bridge
-
-volumes:
-  ssl_certs:
