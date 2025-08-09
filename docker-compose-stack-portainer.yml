@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  rx-veiculos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NEXTAUTH_URL=https://rxnegocio.com.br
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXT_PUBLIC_FIPE_API_TOKEN=${NEXT_PUBLIC_FIPE_API_TOKEN}
+      - NEXT_PUBLIC_APP_URL=https://rxnegocio.com.br
+      - WEBSITE_URL=https://rxnegocio.com.br
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    networks:
+      - traefik
+    labels:
+      # Habilita Traefik
+      - "traefik.enable=true"
+      
+      # Configuração da rede
+      - "traefik.docker.network=traefik"
+      
+      # Roteamento HTTP (redireciona para HTTPS)
+      - "traefik.http.routers.rx-veiculos-http.rule=Host(`rxnegocio.com.br`)"
+      - "traefik.http.routers.rx-veiculos-http.entrypoints=web"
+      - "traefik.http.routers.rx-veiculos-http.middlewares=redirect-to-https"
+      
+      # Roteamento HTTPS
+      - "traefik.http.routers.rx-veiculos.rule=Host(`rxnegocio.com.br`)"
+      - "traefik.http.routers.rx-veiculos.entrypoints=websecure"
+      - "traefik.http.routers.rx-veiculos.tls.certresolver=letsencrypt"
+      
+      # Configuração do serviço
+      - "traefik.http.services.rx-veiculos.loadbalancer.server.port=3000"
+      
+      # Middleware de redirecionamento HTTPS
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+
+networks:
+  traefik:
+    external: true
