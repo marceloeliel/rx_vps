@@ -258,13 +258,309 @@ Configure webhook no GitHub para auto-deploy:
 
 ---
 
+## **🌐 Configuração de Domínio e SSL (Produção)**
+
+### **⚠️ Importante para Acesso via Domínio**
+Se você está tentando acessar via `https://rxnegocio.com.br/`, você precisa configurar:
+
+### **1. Configurar Proxy Reverso no Portainer**
+
+#### **Opção A: Traefik (Recomendado para Portainer)**
+1. **Portainer** → **Stacks** → **Add stack**
+2. **Nome**: `traefik-proxy`
+3. **Web editor** com este código:
+
+```yaml
+version: '3.8'
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Dashboard Traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-data:/data
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=seu-email@exemplo.com
+      - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.rxnegocio.com.br`)"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+    networks:
+      - traefik-network
+
+volumes:
+  traefik-data:
+
+networks:
+  traefik-network:
+    external: true
+```
+
+#### **Opção B: Nginx Proxy Manager (Interface Gráfica)**
+1. **Portainer** → **Stacks** → **Add stack**
+2. **Nome**: `nginx-proxy-manager`
+3. **Web editor** com este código:
+
+```yaml
+version: '3.8'
+services:
+  nginx-proxy-manager:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '81:81'  # Interface Admin
+    volumes:
+      - nginx-data:/data
+      - nginx-letsencrypt:/etc/letsencrypt
+    networks:
+      - proxy-network
+
+volumes:
+  nginx-data:
+  nginx-letsencrypt:
+
+networks:
+  proxy-network:
+    external: true
+```
+
+### **2. Modificar Stack da Aplicação RX-Veículos**
+
+#### **Para Traefik:**
+1. **Portainer** → **Stacks** → **rx-git** → **Editor**
+2. Adicione estas labels no serviço `rx-veiculos`:
+
+```yaml
+services:
+  rx-veiculos:
+    # ... configurações existentes ...
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rx-veiculos.rule=Host(`rxnegocio.com.br`)"
+      - "traefik.http.routers.rx-veiculos.tls.certresolver=letsencrypt"
+      - "traefik.http.services.rx-veiculos.loadbalancer.server.port=3000"
+    networks:
+      - traefik-network
+      - rx-network
+
+networks:
+  traefik-network:
+    external: true
+  rx-network:
+    driver: bridge
+```
+
+#### **Para Nginx Proxy Manager:**
+1. Acesse: `http://SEU_IP:81`
+2. **Login padrão**: `admin@example.com` / `changeme`
+3. **Proxy Hosts** → **Add Proxy Host**
+4. **Domain Names**: `rxnegocio.com.br`
+5. **Forward Hostname/IP**: `rx-veiculos` (nome do container)
+6. **Forward Port**: `3000`
+7. **SSL** → **Request a new SSL Certificate** → **Force SSL**
+
+### **3. Variáveis de Ambiente para Domínio**
+Atualize estas variáveis no Portainer:
+
+```env
+NEXTAUTH_URL=https://rxnegocio.com.br
+NEXT_PUBLIC_APP_URL=https://rxnegocio.com.br
+WEBSITE_URL=https://rxnegocio.com.br
+```
+
+### **4. Configurar DNS**
+No seu provedor de domínio (Registro.br, GoDaddy, etc.):
+```
+Tipo: A
+Nome: @
+Valor: SEU_IP_DO_SERVIDOR
+TTL: 3600
+```
+
+### **5. Criar Network no Portainer**
+1. **Portainer** → **Networks** → **Add network**
+2. **Nome**: `traefik-network` (se usar Traefik)
+3. **Driver**: `bridge`
+4. **Deploy**
+
+### **6. Ordem de Deploy**
+1. ✅ Criar network (`traefik-network`)
+2. ✅ Deploy proxy (Traefik ou Nginx Proxy Manager)
+3. ✅ Modificar stack RX-Veículos com labels
+4. ✅ Atualizar variáveis de ambiente
+5. ✅ Redeploy stack RX-Veículos
+
+---
+
 ## **✅ Checklist Final**
 
+### **Deploy Básico (Porta 3000)**
 - [ ] Stack criada com sucesso
 - [ ] Todas as variáveis configuradas
 - [ ] Aplicação rodando (porta 3000)
 - [ ] Health check passando
 - [ ] Logs sem erros críticos
-- [ ] Acesso via browser funcionando
+- [ ] Acesso via `http://SEU_IP:3000` funcionando
+
+### **Produção com Domínio (HTTPS) - Via Portainer**
+- [ ] Network `traefik-network` criada no Portainer
+- [ ] Stack do proxy (Traefik ou Nginx Proxy Manager) deployada
+- [ ] DNS configurado (A record apontando para o servidor)
+- [ ] Stack RX-Veículos modificada com labels do proxy
+- [ ] Variáveis de ambiente atualizadas com domínio HTTPS
+- [ ] Stack RX-Veículos redeployada
+- [ ] SSL automático funcionando (Let's Encrypt)
+- [ ] Acesso via `https://rxnegocio.com.br` funcionando
+
+### **🚀 Recomendação: Nginx Proxy Manager**
+Para não-programadores, recomendo o **Nginx Proxy Manager** por ter interface gráfica:
+1. Mais fácil de configurar
+2. Interface web amigável
+3. SSL automático com 1 clique
+4. Logs visuais
+5. Gerenciamento de certificados simplificado
 
 **🎉 Sua aplicação RX Veículos está rodando no Portainer!**
+
+---
+
+## **🔍 Troubleshooting - Não Consegue Acessar**
+
+### **❌ Problema: Site não carrega `https://rxnegocio.com.br`**
+
+#### **VERIFICAÇÃO 1: DNS Propagado?**
+```bash
+# Teste no seu computador
+nslookup rxnegocio.com.br
+# Deve retornar o IP do seu servidor
+```
+
+#### **VERIFICAÇÃO 2: Nginx Proxy Manager funcionando?**
+1. Acesse: `http://SEU_IP:81`
+2. Se não abrir → Nginx Proxy Manager não está rodando
+3. **Portainer** → **Containers** → Verifique se `nginx-proxy-manager` está **running**
+
+#### **VERIFICAÇÃO 3: Proxy Host configurado?**
+1. Acesse: `http://SEU_IP:81`
+2. **Proxy Hosts** → Deve ter `rxnegocio.com.br` listado
+3. **Status**: deve estar **Online** (verde)
+
+#### **VERIFICAÇÃO 4: SSL Certificate gerado?**
+1. **Nginx Proxy Manager** → **SSL Certificates**
+2. Deve ter certificado para `rxnegocio.com.br`
+3. **Status**: deve estar **Valid**
+
+#### **VERIFICAÇÃO 5: Container RX-Veículos rodando?**
+1. **Portainer** → **Containers**
+2. Container `rx-veiculos` deve estar **running**
+3. **Health**: deve estar **healthy** (verde)
+
+#### **VERIFICAÇÃO 6: Networks conectadas?**
+1. **Portainer** → **Containers** → `rx-veiculos` → **Inspect**
+2. **Networks**: deve ter `proxy-network` E `rx-network`
+
+### **🚨 Soluções Rápidas**
+
+#### **Se Porta 3000 Bloqueada (Firewall):**
+
+**🔥 SOLUÇÃO MAIS PROVÁVEL - LIBERAR PORTA 3000**
+
+**Via SSH no servidor:**
+```bash
+# Ubuntu/Debian (UFW)
+sudo ufw allow 3000
+sudo ufw reload
+
+# CentOS/RHEL (Firewalld)
+sudo firewall-cmd --permanent --add-port=3000/tcp
+sudo firewall-cmd --reload
+
+# Método alternativo (iptables)
+sudo iptables -A INPUT -p tcp --dport 3000 -j ACCEPT
+sudo iptables-save
+```
+
+**Verificar se a porta foi liberada:**
+```bash
+# Testar se a porta está aberta
+sudo netstat -tlnp | grep :3000
+# ou
+sudo ss -tlnp | grep :3000
+
+# Verificar regras do firewall
+sudo ufw status
+# ou
+sudo firewall-cmd --list-ports
+```
+
+**⚠️ IMPORTANTE:** Após liberar a porta, teste imediatamente:
+- `http://31.97.92.120:3000`
+- Se funcionar, o problema era o firewall
+- Se não funcionar, verifique os logs do container
+
+#### **Se DNS não propagou (24-48h):**
+```
+# Teste temporário editando hosts
+# Windows: C:\Windows\System32\drivers\etc\hosts
+# Adicione esta linha:
+SEU_IP_SERVIDOR rxnegocio.com.br
+```
+
+#### **Se Nginx Proxy Manager não roda:**
+1. **Portainer** → **Stacks** → `nginx-proxy-manager`
+2. **Editor** → **Update the stack**
+3. Aguarde deploy
+
+#### **Se RX-Veículos não conecta ao proxy:**
+1. **Portainer** → **Stacks** → `rx-git` → **Editor**
+2. Verifique se tem estas linhas:
+```yaml
+    networks:
+      - rx-network
+      - proxy-network
+```
+3. **Update the stack**
+
+#### **Se SSL falha:**
+1. **Nginx Proxy Manager** → **Proxy Hosts**
+2. **Edit** o host `rxnegocio.com.br`
+3. **SSL** → **Request a new SSL Certificate**
+4. **Save**
+
+### **📋 Checklist de Diagnóstico**
+
+- [ ] DNS aponta para o servidor (`nslookup rxnegocio.com.br`)
+- [ ] Nginx Proxy Manager acessível (`http://SEU_IP:81`)
+- [ ] Proxy Host criado para `rxnegocio.com.br`
+- [ ] SSL Certificate válido
+- [ ] Container `rx-veiculos` rodando
+- [ ] Container `nginx-proxy-manager` rodando
+- [ ] Networks `proxy-network` conectadas
+- [ ] Portas 80 e 443 abertas no firewall
+
+### **🆘 Teste de Emergência**
+
+Se nada funcionar, teste o acesso direto:
+```
+http://SEU_IP:3000
+```
+
+Se funcionar → problema é no proxy
+Se não funcionar → problema é na aplicação
+
+**💡 Dica**: Verifique os logs no Portainer para mais detalhes dos erros.
