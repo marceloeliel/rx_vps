@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const FIPE_API_BASE_URL = 'https://fipe.parallelum.com.br/api/v2'
-const FIPE_API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxYWZmMzBjMS1lMjhlLTRjNjctYTkwYS0zNGVlNzUyNmJlYTAiLCJlbWFpbCI6InNlZ3RyYWtlckBnbWFpbC5jb20iLCJpYXQiOjE3Mzk1NDYwMTJ9.zDH9TepQA78CoVGAcl4hlbWZXdwAW2OIXEH2IkOPS_I'
+const FIPE_API_TOKEN = process.env.NEXT_PUBLIC_FIPE_API_TOKEN
 
 const TIPOS_VEICULO = {
   carro: 'cars',
@@ -11,10 +11,10 @@ const TIPOS_VEICULO = {
 
 export async function GET(
   request: Request,
-  { params }: { params: { type: string; brand: string; model: string } }
+  context: { params: Promise<{ type: string; brand: string; model: string }> }
 ) {
   try {
-    const { type, brand, model } = await params
+    const { type, brand, model } = await context.params
     
     const tipoConvertido = TIPOS_VEICULO[type as keyof typeof TIPOS_VEICULO] || 'cars'
     
@@ -22,7 +22,7 @@ export async function GET(
     
     const response = await fetch(`${FIPE_API_BASE_URL}/${tipoConvertido}/brands/${brand}/models/${model}/years`, {
       headers: {
-        'X-Subscription-Token': FIPE_API_TOKEN,
+        'X-Subscription-Token': FIPE_API_TOKEN || '',
         'Content-Type': 'application/json',
       },
     })
@@ -46,4 +46,4 @@ export async function GET(
       { status: 500 }
     )
   }
-} 
+}

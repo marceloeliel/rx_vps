@@ -44,11 +44,17 @@ export function useUserData(options: UseUserDataOptions = {}) {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       
       if (userError || !user) {
+        setUserData({
+          user: null,
+          profile: null,
+          loading: false,
+          error: null // Não tratar como erro se usuário não está autenticado
+        })
+        
         if (redirectOnError) {
           window.location.href = "/login"
-          return
         }
-        throw new Error("Usuário não autenticado")
+        return
       }
 
       // 2. Preparar operações paralelas

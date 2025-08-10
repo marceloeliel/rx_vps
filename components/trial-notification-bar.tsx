@@ -5,62 +5,22 @@ import { X, Clock, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { useSubscription } from "@/hooks/use-subscription"
-import { useTrial } from "@/hooks/use-trial"
+import { createClient } from "@/lib/supabase/client"
 
-export function TrialNotificationBar() {
-  const [isVisible, setIsVisible] = useState(true)
-  const [isDismissed, setIsDismissed] = useState(false)
-  const { subscriptionStatus } = useSubscription()
-  const { isInTrial, daysRemaining, loading: trialLoading } = useTrial()
-
-  // Verificar se o card foi dispensado anteriormente
-  useEffect(() => {
-    const dismissed = localStorage.getItem('trial-notification-dismissed')
-    if (dismissed === 'true') {
-      setIsDismissed(true)
-      setIsVisible(false)
-    }
-  }, [])
-
-  // Se ainda está carregando dados do trial, não exibir nada
-  if (trialLoading) {
-    return null
-  }
-
-  // Calcular estados baseados nos dados reais do trial
-  const isExpired = daysRemaining !== null && daysRemaining <= 0
-  const isNearExpiry = daysRemaining !== null && daysRemaining <= 3 && daysRemaining > 0
-  const isBlocked = isExpired && !subscriptionStatus.isActive
-  
-  // Só exibir se o usuário está em trial ou tem um plano ativo
-  const shouldShow = isInTrial || subscriptionStatus.isActive || subscriptionStatus.planType !== null
-
-  const handleClose = () => {
-    setIsVisible(false)
-    setIsDismissed(true)
-    localStorage.setItem('trial-notification-dismissed', 'true')
-  }
-
-  // Não mostrar se não deveria exibir (não está em trial e não tem plano ativo)
-  if (!shouldShow) {
-    return null
-  }
-
-  // Se não há dados de trial válidos, não exibir
-  if (daysRemaining === null) {
-    return null
-  }
-
-  // Não mostrar se foi dispensado (exceto se bloqueado)
-  if (isDismissed && !isBlocked) {
-    return null
-  }
-
-  if (!isVisible) {
-    return null
-  }
-
+// Componente interno que renderiza o conteúdo baseado no estado do trial
+function TrialNotificationContentRenderer({ 
+  subscription, 
+  trial, 
+  isVisible, 
+  setIsVisible, 
+  isDismissed, 
+  setIsDismissed,
+  isExpired,
+  isNearExpiry,
+  isBlocked,
+  daysRemaining,
+  handleClose
+}: any) {
   if (isExpired && isBlocked) {
     return (
       <Card className="fixed bottom-4 left-4 z-50 w-96 bg-red-50 border-red-200 shadow-lg">
@@ -78,7 +38,6 @@ export function TrialNotificationBar() {
               </div>
             </div>
           </div>
-
         </div>
       </Card>
     )
@@ -104,7 +63,6 @@ export function TrialNotificationBar() {
               <X className="h-4 w-4" />
             </Button>
           </div>
-
         </div>
       </Card>
     )
@@ -162,10 +120,127 @@ export function TrialNotificationBar() {
         <div className="flex items-center justify-center mt-3">
           <Badge variant="outline" className="border-blue-300 text-blue-700">
             {daysRemaining} {daysRemaining.toString() === '1' ? 'dia' : 'dias'}
-
           </Badge>
         </div>
       </div>
     </Card>
   )
+}
+
+// Componente principal que gerencia o estado e lógica
+export function TrialNotificationBar() {
+  const [isVisible, setIsVisible] = useState(true)
+  const [isDismissed, setIsDismissed] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [trialData, setTrialData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  
+  const supabase = createClient()
+  
+  const loadTrialData = async () => {
+    try {
+      setLoading(true)
+      
+      // Verificar se há usuário autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        setLoading(false)
+        return
+      }
+      
+      // Buscar dados do trial
+      const { data: trialPeriod, error: trialError } = await supabase
+        .from('trial_periods')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (trialError && trialError.code !== 'PGRST116') {
+        console.error('Erro ao buscar trial:', trialError)
+        setLoading(false)
+        return
+      }
+      
+      if (trialPeriod) {
+        const now = new Date()
+        const endDate = new Date(trialPeriod.end_date)
+        const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        
+        setTrialData({
+          isInTrial: true,
+          daysRemaining: Math.max(0, daysRemaining),
+          endDate: trialPeriod.end_date
+        })
+      }
+      
+      setLoading(false)
+    } catch (error) {
+      console.error('Erro ao carregar dados do trial:', error)
+      setLoading(false)
+    }
+  }
+
+  // Aguardar montagem do componente
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  // Verificar se o card foi dispensado anteriormente
+  useEffect(() => {
+    const dismissed = localStorage.getItem('trial-notification-dismissed')
+    if (dismissed === 'true') {
+      setIsDismissed(true)
+      setIsVisible(false)
+    }
+  }, [])
+  
+  // Carregar dados do trial
+  useEffect(() => {
+    loadTrialData()
+  }, [])
+
+  const handleClose = () => {
+    setIsVisible(false)
+    setIsDismissed(true)
+    localStorage.setItem('trial-notification-dismissed', 'true')
+  }
+  
+  // Não renderizar até estar montado ou se ainda está carregando
+  if (!mounted || loading || !trialData) {
+    return null
+  }
+  
+  const { daysRemaining } = trialData
+  
+  // Calcular estados baseados nos dados reais do trial
+  const isExpired = daysRemaining <= 0
+  const isNearExpiry = daysRemaining <= 3 && daysRemaining > 0
+  const isBlocked = isExpired // Assumindo que trial expirado bloqueia acesso
+  
+  // Não mostrar se foi dispensado (exceto se bloqueado)
+  if (isDismissed && !isBlocked) {
+    return null
+  }
+
+  if (!isVisible) {
+    return null
+  }
+
+  // Calcular estados para renderização
+  const renderProps = {
+    subscription: { subscriptionStatus: { isActive: false } },
+    trial: trialData,
+    isVisible,
+    setIsVisible,
+    isDismissed,
+    setIsDismissed,
+    isExpired,
+    isNearExpiry,
+    isBlocked,
+    daysRemaining,
+    handleClose
+  }
+
+  return <TrialNotificationContentRenderer {...renderProps} />
 }

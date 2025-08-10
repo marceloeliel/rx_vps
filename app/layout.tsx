@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "@/components/providers"
 import { WhatsAppFloatButton } from "@/components/whatsapp-float-button"
 import { TrialNotificationBar } from "@/components/trial-notification-bar"
+import { PageTransition } from "@/components/page-transition"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -87,9 +88,8 @@ export default function RootLayout({
           <div className="flex flex-col min-h-screen">
             <TrialNotificationBar />
             <main className="flex-grow">
-              {children}
+              <PageTransition>{children}</PageTransition>
             </main>
-
           </div>
         </Providers>
         <Toaster />

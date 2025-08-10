@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useTrial } from "@/hooks/use-trial"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -19,7 +20,17 @@ export function TrialCounter({
   className,
   showUpgradeButton = true 
 }: TrialCounterProps) {
+  const [mounted, setMounted] = useState(false)
   const { isInTrial, daysRemaining, loading, trialPeriod } = useTrial()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Não renderizar até estar montado
+  if (!mounted) {
+    return null
+  }
 
   // Não exibir se não estiver carregando e não estiver em trial
   if (loading || !isInTrial || daysRemaining === null) {
