@@ -8,7 +8,6 @@ const nextConfig = {
   
   // Configurações experimentais básicas
   experimental: {
-    optimizeCss: true,
     scrollRestoration: true,
   },
   
