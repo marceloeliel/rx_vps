@@ -118,4 +118,4 @@ MIT License - veja [LICENSE](LICENSE) para detalhes.
 
 ---
 
-**Desenvolvido com ❤️ para o mercado automotivo brasileiro** 🇧🇷 
+**Desenvolvido com ❤️ para o mercado automotivo brasileiro** 🇧🇷
