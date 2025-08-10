@@ -238,12 +238,12 @@ export async function getAgencySales(
       buyer_email: undefined,
       buyer_phone: undefined,
       buyer_document: undefined,
-      notes: null,
-      contract_url: null,
-      payment_method: null,
-      updated_at: null,
-      completed_at: null,
-      metadata: null
+      notes: undefined,
+      contract_url: undefined,
+      payment_method: undefined,
+      updated_at: '',
+      completed_at: undefined,
+      metadata: undefined
     }))
 
     console.log('✅ [SALES] Vendas obtidas via SQL:', salesWithSellerName.length)
