@@ -60,7 +60,7 @@ export default function HomePage() {
     // Verifica se o usuário é uma agência com plano ativo
     return profile && 
            profile.tipo_usuario === 'agencia' && 
-           subscriptionStatus?.hasAccess
+           subscriptionStatus?.isActive
   }
 
   // Função para verificar se o veículo é novo (menos de 7 dias)

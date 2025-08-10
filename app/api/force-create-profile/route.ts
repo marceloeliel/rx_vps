@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     console.log("🚀 [FORCE-CREATE] UserId:", userId)
 
     // Usar server client com service role (contorna RLS)
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // 1. Primeiro, criar/atualizar o perfil
     console.log("💾 [FORCE-CREATE] Inserindo perfil na tabela...")

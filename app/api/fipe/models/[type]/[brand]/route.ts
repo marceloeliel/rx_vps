@@ -11,7 +11,7 @@ const TIPOS_VEICULO = {
 
 export async function GET(
   request: Request,
-  { params }: { params: { type: string; brand: string } }
+  { params }: { params: Promise<{ type: string; brand: string }> }
 ) {
   try {
     const { type, brand } = await params
@@ -46,4 +46,4 @@ export async function GET(
       { status: 500 }
     )
   }
-} 
+}
