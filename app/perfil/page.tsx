@@ -60,6 +60,7 @@ import {
 } from "@/lib/utils/masks"
 import { AgencyPanelButton } from "@/components/agency-panel-button"
 import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import { TrialCounter } from "@/components/trial-counter"
 import { UserPlanDetails } from "@/components/user-plan-details"
 
@@ -121,7 +122,28 @@ const getPlanColors = (planId: string | null | undefined) => {
   }
 }
 
-export default function PerfilPage() {
+// Componente separado para lidar com search params
+function ErrorHandler() {
+  const searchParams = useSearchParams()
+  const error = searchParams.get('error')
+  const { toast } = useToast()
+  const router = useRouter()
+
+  useEffect(() => {
+    // Mostrar mensagem de erro se foi redirecionado do painel da agência
+    if (error === 'agency_access_denied') {
+      toast({
+        variant: "destructive",
+        title: "Acesso restrito",
+        description: "Apenas agências cadastradas podem acessar o painel. Atualize seu perfil para tipo 'Agência' para ter acesso.",
+      })
+    }
+  }, [error, toast])
+
+  return null
+}
+
+function PerfilPageContent() {
   const [cepLoading, setCepLoading] = useState(false)
   const [saveLoading, setSaveLoading] = useState(false)
   const [profileLoading, setProfileLoading] = useState(true)
@@ -182,23 +204,9 @@ export default function PerfilPage() {
     needsRenewal: false
   })
 
-  const searchParams = useSearchParams()
-  const error = searchParams.get('error')
-
   const handlePlanosClick = () => {
     router.push("/planos-publicos")
   }
-
-  useEffect(() => {
-    // Mostrar mensagem de erro se foi redirecionado do painel da agência
-    if (error === 'agency_access_denied') {
-      toast({
-        variant: "destructive",
-        title: "Acesso restrito",
-        description: "Apenas agências cadastradas podem acessar o painel. Atualize seu perfil para tipo 'Agência' para ter acesso.",
-      })
-    }
-  }, [error, toast])
 
   // Verificar usuário e carregar perfil
   useEffect(() => {
@@ -1640,5 +1648,16 @@ export default function PerfilPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PerfilPage() {
+  return (
+    <>
+      <Suspense fallback={null}>
+        <ErrorHandler />
+      </Suspense>
+      <PerfilPageContent />
+    </>
   )
 }
