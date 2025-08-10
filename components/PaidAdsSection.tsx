@@ -137,7 +137,7 @@ export default function PaidAdsSection({ maxAds = 10, showTitle = true }: PaidAd
           )}
           
           {/* Carousel Container - Full Width */}
-          <div className="relative h-[580px] md:h-96 overflow-hidden shadow-2xl">
+          <div className="relative min-h-[400px] md:h-96 overflow-hidden shadow-2xl">
           {/* Slides */}
           <div className="relative h-full">
             {ads.map((ad, index) => (
@@ -148,80 +148,80 @@ export default function PaidAdsSection({ maxAds = 10, showTitle = true }: PaidAd
                  }`}
                >
                                   {/* Split Layout Container */}
-                 <div className="flex flex-col md:flex-row h-full">
+                 <div className="flex flex-col md:flex-row min-h-[400px] md:h-full">
                    {/* Info Section - Mobile: Full width on top, Desktop: 2/3 left */}
-                   <div className="w-full md:w-2/3 h-96 md:h-full bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 relative overflow-hidden">
+                   <div className="w-full md:w-2/3 min-h-[300px] md:h-full bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 relative overflow-hidden">
                      {/* Gradient blend towards image */}
                      <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-700 md:bg-gradient-to-r md:from-gray-900 md:via-gray-800 md:to-transparent"></div>
                      
                      {/* Content */}
-                     <div className="relative z-10 h-full py-8 px-6 md:p-8 lg:p-10">
+                     <div className="relative z-10 h-full py-4 px-4 md:p-8 lg:p-10">
                        <div className="w-full text-white h-full flex flex-col justify-center">
-                         <div className="flex flex-col justify-center py-6">
+                         <div className="flex flex-col justify-center py-2 md:py-6">
                            {/* Header Section */}
-                           <div className="mb-6">
+                           <div className="mb-4 md:mb-6">
                              {/* Featured Badge */}
                              {ad.is_featured && (
-                               <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1 rounded-full text-xs font-semibold mb-3">
+                               <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1 rounded-full text-xs font-semibold mb-2 md:mb-3">
                                  ⭐ DESTAQUE
                                </div>
                              )}
 
                              {/* Company Name */}
-                             <h3 className="text-2xl md:text-2xl lg:text-3xl font-bold mb-3 drop-shadow-lg">
+                             <h3 className="text-xl md:text-2xl lg:text-3xl font-bold mb-2 md:mb-3 drop-shadow-lg">
                                {ad.company_name}
                              </h3>
 
                              {/* Title */}
-                             <h4 className="text-lg md:text-lg lg:text-xl font-semibold mb-3 text-white/90 drop-shadow-md">
+                             <h4 className="text-base md:text-lg lg:text-xl font-semibold mb-2 md:mb-3 text-white/90 drop-shadow-md">
                                {ad.title}
                              </h4>
 
                              {/* Description */}
-                             <p className="text-white/80 mb-0 text-base drop-shadow-sm line-clamp-2">
+                             <p className="text-white/80 mb-0 text-sm md:text-base drop-shadow-sm line-clamp-2">
                                {ad.description}
                              </p>
                            </div>
 
                            {/* Info Cards */}
-                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center border border-white/20">
+                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
+                             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 md:p-3 text-center border border-white/20">
                                <div className="flex items-center justify-center gap-1 mb-1">
-                                 <Star size={16} className="text-yellow-300 fill-yellow-300" />
-                                 <span className="font-bold text-white text-base">{ad.rating}</span>
+                                 <Star size={14} className="text-yellow-300 fill-yellow-300 md:w-4 md:h-4" />
+                                 <span className="font-bold text-white text-sm md:text-base">{ad.rating}</span>
                                </div>
-                               <div className="text-white/70 text-sm">
+                               <div className="text-white/70 text-xs md:text-sm">
                                  {ad.review_count} avaliações
                                </div>
                              </div>
 
-                             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center border border-white/20">
+                             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 md:p-3 text-center border border-white/20">
                                <div className="flex items-center justify-center gap-1 mb-1">
-                                 <Users size={16} className="text-white" />
-                                 <span className="font-bold text-white text-base">{ad.vehicle_count}+</span>
+                                 <Users size={14} className="text-white md:w-4 md:h-4" />
+                                 <span className="font-bold text-white text-sm md:text-base">{ad.vehicle_count}+</span>
                                </div>
-                               <div className="text-white/70 text-sm">Veículos</div>
+                               <div className="text-white/70 text-xs md:text-sm">Veículos</div>
                              </div>
 
-                             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center border border-white/20">
+                             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 md:p-3 text-center border border-white/20">
                                <div className="flex items-center justify-center gap-1 mb-1">
-                                 <MapPin size={16} className="text-white" />
-                                 <span className="font-bold text-white text-sm">{ad.location}</span>
+                                 <MapPin size={14} className="text-white md:w-4 md:h-4" />
+                                 <span className="font-bold text-white text-xs md:text-sm">{ad.location}</span>
                                </div>
-                               <div className="text-white/70 text-sm">Local</div>
+                               <div className="text-white/70 text-xs md:text-sm">Local</div>
                              </div>
 
-                             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center border border-white/20">
+                             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 md:p-3 text-center border border-white/20">
                                <div className="flex items-center justify-center gap-1 mb-1">
-                                 <TrendingUp size={16} className="text-green-300" />
-                                 <span className="font-bold text-white text-base">{ad.satisfaction_rate}%</span>
+                                 <TrendingUp size={14} className="text-green-300 md:w-4 md:h-4" />
+                                 <span className="font-bold text-white text-sm md:text-base">{ad.satisfaction_rate}%</span>
                                </div>
-                               <div className="text-white/70 text-sm">Satisfação</div>
+                               <div className="text-white/70 text-xs md:text-sm">Satisfação</div>
                              </div>
                            </div>
 
                            {/* Action Buttons */}
-                           <div className="flex gap-3 md:gap-4">
+                           <div className="flex gap-2 md:gap-4">
                              <button
                                onClick={() => {
                                  // Usar WhatsApp da agência se disponível, senão usar o número da RX
@@ -230,17 +230,15 @@ export default function PaidAdsSection({ maxAds = 10, showTitle = true }: PaidAd
                                  const whatsappUrl = `https://wa.me/${telefone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
                                  window.open(whatsappUrl, '_blank')
                                }}
-                               className={`group relative flex-1 px-4 md:px-6 py-3 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 overflow-hidden text-base contact-button-${ad.id}`}
+                               className={`group relative flex-1 px-3 md:px-6 py-2 md:py-3 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 overflow-hidden text-sm md:text-base contact-button-${ad.id}`}
                                style={{ backgroundColor: ad.primary_color }}
                              >
                                <div className="flex items-center justify-center gap-2">
-                                 <Phone size={18} />
+                                 <Phone size={16} className="md:w-[18px] md:h-[18px]" />
                                  <span>Entrar em Contato</span>
                                </div>
                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                              </button>
-
-
                            </div>
                          </div>
                        </div>
@@ -248,7 +246,7 @@ export default function PaidAdsSection({ maxAds = 10, showTitle = true }: PaidAd
                    </div>
 
                    {/* Image Section - Mobile: Full width below, Desktop: 1/3 right */}
-                   <div className="w-full md:w-1/3 flex-1 md:h-full relative overflow-hidden">
+                   <div className="w-full md:w-1/3 min-h-[200px] md:h-full relative overflow-hidden">
                      <img 
                        src={ad.image_url} 
                        alt={ad.company_name}

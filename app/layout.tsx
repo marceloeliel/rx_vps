@@ -102,21 +102,7 @@ export default function RootLayout({
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', async function() {
                   try {
-                    // Limpar caches antigos para evitar problemas
-                    if (window.caches) {
-                      const cacheKeys = await caches.keys();
-                      await Promise.all(
-                        cacheKeys.map(cacheName => caches.delete(cacheName))
-                      );
-                    }
-                    
-                    // Desregistrar service workers antigos
-                    const registrations = await navigator.serviceWorker.getRegistrations();
-                    await Promise.all(
-                      registrations.map(registration => registration.unregister())
-                    );
-                    
-                    // Registrar novo service worker
+                    // Registrar service worker
                     const registration = await navigator.serviceWorker.register('/sw.js');
                     console.log('SW registered: ', registration);
                   } catch (error) {

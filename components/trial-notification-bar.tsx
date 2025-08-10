@@ -6,20 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useSubscription } from "@/hooks/use-subscription"
+import { useTrial } from "@/hooks/use-trial"
 
 export function TrialNotificationBar() {
   const [isVisible, setIsVisible] = useState(true)
   const [isDismissed, setIsDismissed] = useState(false)
   const { subscriptionStatus } = useSubscription()
-
-  // Dados simulados - substituir pelo hook useTrial quando a tabela estiver criada
-  const daysRemaining = 15
-  const isExpired = daysRemaining <= 0
-  const isNearExpiry = daysRemaining <= 3 && daysRemaining > 0
-  const isBlocked = false // Será true quando expirado e sem plano ativo
-  
-  // Só exibir se o usuário tem um plano ativo
-  const hasActivePlan = subscriptionStatus.isActive || subscriptionStatus.planType !== null
+  const { isInTrial, daysRemaining, loading: trialLoading } = useTrial()
 
   // Verificar se o card foi dispensado anteriormente
   useEffect(() => {
@@ -30,14 +23,32 @@ export function TrialNotificationBar() {
     }
   }, [])
 
+  // Se ainda está carregando dados do trial, não exibir nada
+  if (trialLoading) {
+    return null
+  }
+
+  // Calcular estados baseados nos dados reais do trial
+  const isExpired = daysRemaining !== null && daysRemaining <= 0
+  const isNearExpiry = daysRemaining !== null && daysRemaining <= 3 && daysRemaining > 0
+  const isBlocked = isExpired && !subscriptionStatus.isActive
+  
+  // Só exibir se o usuário está em trial ou tem um plano ativo
+  const shouldShow = isInTrial || subscriptionStatus.isActive || subscriptionStatus.planType !== null
+
   const handleClose = () => {
     setIsVisible(false)
     setIsDismissed(true)
     localStorage.setItem('trial-notification-dismissed', 'true')
   }
 
-  // Não mostrar se não tem plano ativo
-  if (!hasActivePlan) {
+  // Não mostrar se não deveria exibir (não está em trial e não tem plano ativo)
+  if (!shouldShow) {
+    return null
+  }
+
+  // Se não há dados de trial válidos, não exibir
+  if (daysRemaining === null) {
     return null
   }
 

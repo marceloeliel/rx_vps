@@ -21,4 +21,4 @@ export function Providers({ children }: ProvidersProps) {
       <PWAInstallBanner />
     </UserProvider>
   )
-} 
+}

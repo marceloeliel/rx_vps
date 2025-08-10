@@ -125,6 +125,8 @@ export default function SimuladorPage() {
 
   // Capturar parâmetros da URL para pré-preencher dados do veículo
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    
     const urlParams = new URLSearchParams(window.location.search)
     const veiculoId = urlParams.get('veiculo')
     const marca = urlParams.get('marca')
@@ -1284,10 +1286,10 @@ export default function SimuladorPage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => window.close()}>
+              <Button variant="ghost" size="sm" onClick={() => router.back()}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <span className="text-xl font-bold text-gray-900">Sair</span>
+
             </div>
             
             {/* Progress indicator for mobile */}

@@ -10,20 +10,12 @@ import {
   Crown, 
   Car, 
   Star, 
-  HardDrive, 
-  Zap, 
-  Mail, 
-  Phone, 
-  MessageCircle, 
-  Clock, 
   BarChart3, 
   Settings, 
-  Database, 
   UserCheck,
   CheckCircle,
   XCircle,
   ArrowUpCircle,
-
   AlertTriangle
 } from 'lucide-react'
 import { usePlanControl, usePlanFeatures } from '@/hooks/use-plan-control'
@@ -37,7 +29,6 @@ interface UserPlanDetailsProps {
 export function UserPlanDetails({ showUpgradeButton = true, compact = false }: UserPlanDetailsProps) {
   const { 
     userPlan, 
-    userUsage, 
     loading, 
     canAddVehicle, 
     canFeatureVehicle,
@@ -122,11 +113,6 @@ export function UserPlanDetails({ showUpgradeButton = true, compact = false }: U
     }
   }
   
-  const getProgressColor = (percentage: number) => {
-    if (percentage >= 90) return 'bg-red-500'
-    if (percentage >= 70) return 'bg-yellow-500'
-    return 'bg-green-500'
-  }
   
   if (compact) {
     const colors = getPlanColors(userPlan.id)

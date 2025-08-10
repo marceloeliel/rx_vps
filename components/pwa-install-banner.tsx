@@ -73,7 +73,7 @@ export function PWAInstallBanner() {
     <>
       {/* Overlay sutil */}
       <div 
-        className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-[55] transition-opacity duration-300 ${
           isAnimating ? 'opacity-100' : 'opacity-0'
         }`}
         onClick={handleLater}
@@ -81,7 +81,7 @@ export function PWAInstallBanner() {
       
       {/* Barra de instalação */}
       <div 
-        className={`fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-50 transition-all duration-500 ease-out ${
+        className={`fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-[60] transition-all duration-500 ease-out ${
           isAnimating 
             ? 'translate-y-0 opacity-100 scale-100' 
             : 'translate-y-full opacity-0 scale-95'
@@ -171,4 +171,4 @@ export function PWAInstallBanner() {
       </div>
     </>
   )
-} 
+}

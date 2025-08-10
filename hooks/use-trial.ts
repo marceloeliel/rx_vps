@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { checkTrialPeriod, type TrialPeriod } from "@/lib/supabase/trial"
+import { checkTrialPeriod, createTrialPeriod, type TrialPeriod } from "@/lib/supabase/trial"
 import { useUserData } from "@/hooks/use-user-data"
 
 interface TrialData {
@@ -37,7 +37,18 @@ export function useTrial() {
     try {
       setTrialData(prev => ({ ...prev, loading: true, error: null }))
       
-      const result = await checkTrialPeriod(user.id)
+      let result = await checkTrialPeriod(user.id)
+      
+      // Se não tem trial, criar automaticamente
+      if (!result.isInTrial && !result.trialPeriod) {
+        console.log('Usuário não tem período de trial, criando automaticamente...')
+        const newTrial = await createTrialPeriod(user.id, 'basico')
+        if (newTrial) {
+          console.log('Período de trial criado com sucesso:', newTrial)
+          // Recarregar dados após criar o trial
+          result = await checkTrialPeriod(user.id)
+        }
+      }
       
       setTrialData({
         isInTrial: result.isInTrial,

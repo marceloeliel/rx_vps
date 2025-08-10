@@ -44,26 +44,28 @@ export function useSubscription(): UseSubscriptionReturn {
       setLoading(true)
       setError(null)
 
-      // Buscar usuário
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
+      // Verificar se há uma sessão ativa primeiro
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
-      if (userError) {
-        throw userError
+      if (sessionError) {
+        console.error('Erro ao verificar sessão:', sessionError)
+        // Não lançar erro, apenas definir como não autenticado
       }
 
-      if (!currentUser) {
+      if (!session || !session.user) {
         setUser(null)
         setProfile(null)
         setSubscriptionStatus({
           isActive: false,
           planType: null,
           expiresAt: null,
-          status: 'inactive',
+          status: 'not_authenticated',
           daysRemaining: null
         })
         return
       }
 
+      const currentUser = session.user
       setUser(currentUser)
 
       // Buscar perfil

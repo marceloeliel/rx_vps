@@ -139,7 +139,7 @@ export default function AdminPromocoesPage() {
   // Calcular taxa de conversão
   const getConversionRate = (campaign: CampaignStatistics) => {
     if (campaign.total_users_enrolled === 0) return 0
-    return ((campaign.converted_to_paid / campaign.total_users_enrolled) * 100).toFixed(1)
+    return (campaign.converted_to_paid / campaign.total_users_enrolled) * 100
   }
 
   return (
@@ -235,7 +235,7 @@ export default function AdminPromocoesPage() {
                             </div>
                             <div>
                               <span className="text-gray-500">Conversão:</span>
-                              <div className="font-semibold">{getConversionRate(campaign)}%</div>
+                              <div className="font-semibold">{getConversionRate(campaign).toFixed(1)}%</div>
                             </div>
                           </div>
                         </div>
@@ -339,7 +339,7 @@ export default function AdminPromocoesPage() {
                     <div>
                       <div className="text-2xl font-bold">
                         {campaigns.length > 0 ? (
-                          (campaigns.reduce((sum, c) => sum + parseFloat(getConversionRate(c)), 0) / campaigns.length).toFixed(1)
+                          (campaigns.reduce((sum, c) => sum + getConversionRate(c), 0) / campaigns.length).toFixed(1)
                         ) : (
                           '0.0'
                         )}%
@@ -501,4 +501,4 @@ export default function AdminPromocoesPage() {
       </div>
     </div>
   )
-} 
+}
