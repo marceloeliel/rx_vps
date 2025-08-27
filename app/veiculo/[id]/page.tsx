@@ -348,7 +348,7 @@ export default function VeiculoPage() {
         <meta property="og:title" content={`${veiculo.marca_nome} ${veiculo.modelo_nome} ${veiculo.ano_fabricacao}`} />
         <meta property="og:description" content={`${veiculo.marca_nome} ${veiculo.modelo_nome} ${veiculo.ano_fabricacao} por ${formatPrice(veiculo.preco || 0)}. ${veiculo.quilometragem ? `${formatNumber(veiculo.quilometragem)} km` : ''} ${veiculo.combustivel || ''}`} />
         {imagens.length > 0 && <meta property="og:image" content={imagens[0]} />}
-        <meta property="og:url" content={typeof window !== 'undefined' ? window.location.href : ''} />
+        <meta property="og:url" content={`https://rxnegocios.com.br/veiculo/${veiculo.id}`} />
         
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />

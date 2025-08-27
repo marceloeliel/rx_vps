@@ -12,6 +12,7 @@ import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
+import { HydrationSafeWrapper } from "@/components/hydration-safe-wrapper"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -93,7 +94,26 @@ export default function LoginPage() {
         })
 
         // Aguardar um pouco para mostrar o toast antes de redirecionar
-        setTimeout(() => {
+        setTimeout(async () => {
+          try {
+            // Verificar se o usuário é administrador
+            const { data: adminData } = await supabase
+              .from('adm')
+              .select('usuario')
+              .eq('email', email)
+              .eq('usuario', true)
+              .single()
+
+            if (adminData) {
+              // Usuário é administrador ativo, redirecionar para painel admin
+              router.push("/admin/dashboard")
+              return
+            }
+          } catch (error) {
+            // Se houver erro na verificação de admin, continuar com fluxo normal
+            console.log('Usuário não é administrador, seguindo fluxo normal')
+          }
+
           // Verificar se há uma URL de redirecionamento salva
           const redirectUrl = sessionStorage.getItem('redirectAfterLogin')
           if (redirectUrl) {
@@ -150,7 +170,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-screen bg-white flex overflow-hidden relative">
+    <HydrationSafeWrapper>
+      <div className="h-screen bg-white flex overflow-hidden relative">
       {/* Navbar */}
        <nav className="absolute top-0 left-0 right-0 z-50 bg-transparent px-6 py-4">
          <div className="flex items-center">
@@ -324,6 +345,7 @@ export default function LoginPage() {
         </div>
         </div>
       </div>
-    </div>
+      </div>
+    </HydrationSafeWrapper>
   )
 }

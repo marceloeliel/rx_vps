@@ -188,10 +188,12 @@ export function TrialNotificationBar() {
   
   // Verificar se o card foi dispensado anteriormente
   useEffect(() => {
-    const dismissed = localStorage.getItem('trial-notification-dismissed')
-    if (dismissed === 'true') {
-      setIsDismissed(true)
-      setIsVisible(false)
+    if (typeof window !== 'undefined') {
+      const dismissed = localStorage.getItem('trial-notification-dismissed')
+      if (dismissed === 'true') {
+        setIsDismissed(true)
+        setIsVisible(false)
+      }
     }
   }, [])
   
@@ -203,7 +205,9 @@ export function TrialNotificationBar() {
   const handleClose = () => {
     setIsVisible(false)
     setIsDismissed(true)
-    localStorage.setItem('trial-notification-dismissed', 'true')
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('trial-notification-dismissed', 'true')
+    }
   }
   
   // Não renderizar até estar montado ou se ainda está carregando

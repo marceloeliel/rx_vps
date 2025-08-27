@@ -10,6 +10,22 @@
   "scope": "/",
   "lang": "pt-BR",
   "categories": ["automotive", "business", "shopping"],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.svg",
+      "sizes": "390x844",
+      "type": "image/svg+xml",
+      "form_factor": "narrow",
+      "label": "Interface mobile do RX AUTOS"
+    },
+    {
+      "src": "/screenshot-desktop.svg",
+      "sizes": "1280x720",
+      "type": "image/svg+xml",
+      "form_factor": "wide",
+      "label": "Interface desktop do RX AUTOS"
+    }
+  ],
   "icons": [
     {
       "src": "/images/rxveiculos.png",
@@ -120,4 +136,4 @@
       "url": "/?vehicle=%s"
     }
   ]
-} 
+}

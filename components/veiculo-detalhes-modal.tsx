@@ -256,12 +256,32 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
         }
         
         if (user?.id) {
-          // Usar veiculo.user_id como agency_id (referência à tabela profiles)
-          await createLead(user.id, veiculo.id, veiculo.user_id, 'view_details')
+          // Buscar o profile_id correto baseado no user_id do veículo
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', veiculo.user_id)
+            .single()
+          
+          if (profile) {
+            const result = await createLead(user.id, veiculo.id, profile.id, 'view_details')
+            if (result.error) {
+              console.error('❌ [LEADS] Erro ao criar lead:', result.error)
+            } else {
+              console.log('✅ [LEADS] Lead de visualização criado com sucesso')
+            }
+          } else {
+            console.log('ℹ️ [LEADS] Profile da agência não encontrado, pulando criação de lead')
+          }
         }
       } catch (error) {
-        // Silenciar erro para usuários não autenticados
-        console.log('ℹ️ [LEADS] Lead não criado (usuário não autenticado)')
+        console.error('❌ [LEADS] Erro inesperado ao registrar visualização:', {
+          message: error instanceof Error ? error.message : 'Erro desconhecido',
+          userId: undefined, // Removed reference to undefined user variable
+          vehicleId: veiculo.id,
+          agencyUserId: veiculo.user_id,
+          error
+        })
       }
     }
 

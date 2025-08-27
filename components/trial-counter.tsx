@@ -127,16 +127,16 @@ export function TrialCounter({
         "h-4 w-4",
         isExpiringSoon ? "text-red-600" : "text-orange-600"
       )} />
-      <AlertDescription className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
           <span className={cn(
-            "font-medium",
+            "font-medium text-sm",
             isExpiringSoon ? "text-red-900" : "text-orange-900"
           )}>
             Plano {planName} - Trial:
           </span>
           <span className={cn(
-            "flex items-center gap-1",
+            "flex items-center gap-1 text-sm",
             isExpiringSoon ? "text-red-700" : "text-orange-700"
           )}>
             <Clock className="h-3 w-3" />
@@ -145,12 +145,12 @@ export function TrialCounter({
         </div>
         
         {showUpgradeButton && (
-          <Link href="/planos">
+          <Link href="/planos" className="w-full sm:w-auto">
             <Button 
               size="sm" 
               variant="outline"
               className={cn(
-                "ml-4",
+                "w-full sm:w-auto sm:ml-4 text-xs sm:text-sm px-3 py-1.5",
                 isExpiringSoon 
                   ? "border-red-600 text-red-600 hover:bg-red-600 hover:text-white" 
                   : "border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-white"

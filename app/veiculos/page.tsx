@@ -30,6 +30,7 @@ import {
   Truck,
   Tractor,
   Loader2,
+  Plus,
 } from "lucide-react"
 import {
   getVeiculosPublicos,
@@ -41,6 +42,9 @@ import {
   CORES,
   ESTADOS_VEICULO,
 } from "@/lib/supabase/veiculos"
+import { createClient } from "@/lib/supabase/client"
+import type { User } from "@supabase/supabase-js"
+import { AuthGuard } from "@/components/auth-guard"
 
 export default function VeiculosPage() {
   const searchParams = useSearchParams()
@@ -56,6 +60,12 @@ export default function VeiculosPage() {
   // Estados para o modal de detalhes do veículo
   const [selectedVehicle, setSelectedVehicle] = useState<Veiculo | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  
+  // Estados para usuário e perfil
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [loadingUser, setLoadingUser] = useState(true)
+  const supabase = createClient()
 
   // Estados dos filtros
   const [expandedFilters, setExpandedFilters] = useState<string[]>([
@@ -88,6 +98,44 @@ export default function VeiculosPage() {
     return () => clearTimeout(timer)
   }, [searchModelInput])
 
+  // Verificar usuário logado
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        
+        if (error) {
+          console.error('Erro ao verificar usuário:', error)
+          setLoadingUser(false)
+          return
+        }
+        
+        setUser(user)
+        
+        if (user) {
+          // Buscar perfil do usuário
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single()
+          
+          if (profileError) {
+            console.error('Erro ao buscar perfil:', profileError)
+          } else {
+            setProfile(profileData)
+          }
+        }
+      } catch (error) {
+        console.error('Erro inesperado ao verificar usuário:', error)
+      } finally {
+        setLoadingUser(false)
+      }
+    }
+    
+    checkUser()
+  }, [])
+  
   // Carregar veículos
   useEffect(() => {
     loadVehicles()
@@ -514,8 +562,8 @@ export default function VeiculosPage() {
 )
 
   return (
-    <>
-    <div className="min-h-screen bg-gray-50">
+    <AuthGuard requireAuth={false} showLoader={false}>
+      <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-black text-white px-4 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -551,12 +599,26 @@ export default function VeiculosPage() {
       {/* Page Title */}
       <div className="bg-white py-4 lg:py-6">
         <div className="max-w-7xl mx-auto px-4">
-          <h1 className="text-xl lg:text-2xl font-bold text-gray-900 mb-2">
-            Carros, motos, caminhões e máquinas pesadas
-          </h1>
-          <p className="text-gray-600 text-sm lg:text-base">
-            {loading ? "Carregando..." : `${totalCount.toLocaleString()} anúncios encontrados`}
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-xl lg:text-2xl font-bold text-gray-900 mb-2">
+                Carros, motos, caminhões e máquinas pesadas
+              </h1>
+              <p className="text-gray-600 text-sm lg:text-base">
+                {loading ? "Carregando..." : `${totalCount.toLocaleString()} anúncios encontrados`}
+              </p>
+            </div>
+            
+            {/* Botão Cadastrar Veículo - Visível apenas para vendedores e agências */}
+            {!loadingUser && user && profile && (profile.tipo_usuario === 'vendedor' || profile.tipo_usuario === 'agencia') && (
+              <Link href="/cadastro-veiculo">
+                <Button className="bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-2 flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Cadastrar Veículo
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
@@ -738,6 +800,6 @@ export default function VeiculosPage() {
         }}
       />
     )}
-  </>
-)
+    </AuthGuard>
+  )
 }

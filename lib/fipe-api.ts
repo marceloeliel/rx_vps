@@ -105,7 +105,8 @@ export async function buscarAnos(tipoVeiculo: string, codigoMarca: string, codig
   try {
     console.log('📡 [FIPE] Buscando anos para:', tipoVeiculo, codigoMarca, codigoModelo)
     
-    const response = await fetch(`/api/fipe/years/${tipoVeiculo}/${codigoMarca}/${codigoModelo}`)
+    const url = `/api/fipe/years/${tipoVeiculo}/${codigoMarca}/${codigoModelo}`
+    const response = await fetchWithRetry(url)
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }))
@@ -122,11 +123,47 @@ export async function buscarAnos(tipoVeiculo: string, codigoMarca: string, codig
 }
 
 // Buscar preço FIPE
+// Função auxiliar para retry com backoff exponencial
+async function fetchWithRetry(url: string, maxRetries: number = 3, baseDelay: number = 1000): Promise<Response> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url)
+      
+      // Se a resposta for bem-sucedida ou for um erro que não deve ser retentado, retornar
+      if (response.ok || (response.status !== 429 && response.status !== 500 && response.status !== 502 && response.status !== 503)) {
+        return response
+      }
+      
+      // Se for o último attempt, retornar a resposta mesmo com erro
+      if (attempt === maxRetries) {
+        return response
+      }
+      
+      // Calcular delay com backoff exponencial
+      const delay = baseDelay * Math.pow(2, attempt - 1)
+      console.log(`⏳ [FIPE] Tentativa ${attempt} falhou (${response.status}). Tentando novamente em ${delay}ms...`)
+      
+      await new Promise(resolve => setTimeout(resolve, delay))
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw error
+      }
+      
+      const delay = baseDelay * Math.pow(2, attempt - 1)
+      console.log(`⏳ [FIPE] Tentativa ${attempt} falhou com erro de rede. Tentando novamente em ${delay}ms...`)
+      
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  
+  throw new Error('Máximo de tentativas excedido')
+}
+
 export async function buscarPrecoFipe(tipoVeiculo: string, codigoMarca: string, codigoModelo: string, codigoAno: string): Promise<FipePreco> {
   try {
     console.log('📡 [FIPE] Buscando preço para:', tipoVeiculo, codigoMarca, codigoModelo, codigoAno)
     
-    const response = await fetch(`/api/fipe/price/${tipoVeiculo}/${codigoMarca}/${codigoModelo}/${codigoAno}`)
+    const response = await fetchWithRetry(`/api/fipe/price/${tipoVeiculo}/${codigoMarca}/${codigoModelo}/${codigoAno}`)
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }))
@@ -168,4 +205,4 @@ export function formatarPrecoFipe(preco: string): number {
   // Remove "R$ " e converte para número
   const precoLimpo = preco.replace('R$ ', '').replace(/\./g, '').replace(',', '.')
   return parseFloat(precoLimpo) || 0
-} 
+}

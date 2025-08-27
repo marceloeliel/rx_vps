@@ -8,6 +8,60 @@ interface PageTransitionProps {
   children: React.ReactNode
 }
 
+// Componente para suprimir erros de hidratação causados por extensões do navegador
+function HydrationSafeWrapper({ children }: { children: React.ReactNode }) {
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+    
+    // Suprimir erros de hidratação específicos de extensões do navegador
+    const originalError = console.error
+    console.error = (...args) => {
+      const message = args[0]?.toString() || ''
+      const fullMessage = args.join(' ').toLowerCase()
+      
+      // Padrões de extensões conhecidas
+      const extensionPatterns = [
+        'bis_skin_checked',
+        'data-lastpass-icon-root',
+        'data-dashlane-rid',
+        'data-bitwarden-watching',
+        'data-1p-ignore',
+        'data-gramm'
+      ]
+      
+      // Verificar se é erro de hidratação específico de extensão
+      const isHydrationError = fullMessage.includes('hydration') || 
+                              fullMessage.includes('server rendered html') ||
+                              fullMessage.includes('didn\'t match the client')
+      
+      const hasExtensionAttribute = extensionPatterns.some(pattern => 
+        fullMessage.includes(pattern.toLowerCase())
+      )
+      
+      // Silenciar apenas erros de hidratação com atributos de extensão
+      if (isHydrationError && hasExtensionAttribute) {
+        return
+      }
+      
+      // Permitir TODOS os outros erros (incluindo erros de aplicação)
+      originalError.apply(console, args)
+    }
+
+    return () => {
+      console.error = originalError
+    }
+  }, [])
+
+  // Durante a hidratação, renderizar de forma segura
+  if (!isClient) {
+    return <div suppressHydrationWarning>{children}</div>
+  }
+
+  return <>{children}</>
+}
+
 export function PageTransition({ children }: PageTransitionProps) {
   const pathname = usePathname()
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -70,9 +124,11 @@ export function PageTransition({ children }: PageTransitionProps) {
   }
 
   return (
-    <div className="animate-in fade-in duration-200">
-      {children}
-    </div>
+    <HydrationSafeWrapper>
+      <div className="animate-in fade-in duration-200" suppressHydrationWarning>
+        {children}
+      </div>
+    </HydrationSafeWrapper>
   )
 }
 

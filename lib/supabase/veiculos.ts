@@ -1,4 +1,5 @@
 import { createClient } from "./client"
+import { deleteAllVeiculoFotos } from "./veiculo-storage"
 
 export interface Veiculo {
   id?: string
@@ -217,6 +218,8 @@ export async function createVeiculo(veiculo: VeiculoFormData): Promise<{ data: V
       profile_id: profile?.id || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      // Se não há foto_principal definida mas há fotos, usar a primeira como principal
+      foto_principal: veiculo.foto_principal || (veiculo.fotos && veiculo.fotos.length > 0 ? veiculo.fotos[0] : undefined),
     }
 
     const { data, error } = await supabase.from("veiculos").insert([veiculoData]).select().single()
@@ -238,6 +241,8 @@ export async function updateVeiculo(
     const veiculoData = {
       ...veiculo,
       updated_at: new Date().toISOString(),
+      // Se não há foto_principal definida mas há fotos, usar a primeira como principal
+      foto_principal: veiculo.foto_principal || (veiculo.fotos && veiculo.fotos.length > 0 ? veiculo.fotos[0] : undefined),
     }
 
     const { data, error } = await supabase.from("veiculos").update(veiculoData).eq("id", id).select().single()
@@ -292,9 +297,26 @@ export async function deleteVeiculo(id: string): Promise<{ error: any }> {
   const supabase = createClient()
 
   try {
+    // Primeiro, deletar todas as fotos do storage
+    console.log('🗑️ Deletando fotos do veículo:', id)
+    const fotosDeleted = await deleteAllVeiculoFotos(id)
+    
+    if (!fotosDeleted) {
+      console.warn('⚠️ Não foi possível deletar todas as fotos do storage, mas continuando com a exclusão do veículo')
+    } else {
+      console.log('✅ Fotos do veículo deletadas com sucesso')
+    }
+
+    // Depois, deletar o veículo do banco de dados
     const { error } = await supabase.from("veiculos").delete().eq("id", id)
 
-    return { error }
+    if (error) {
+      console.error('❌ Erro ao deletar veículo do banco:', error)
+      return { error }
+    }
+
+    console.log('✅ Veículo deletado com sucesso:', id)
+    return { error: null }
   } catch (error) {
     console.error("Erro ao deletar veículo:", error)
     return { error }

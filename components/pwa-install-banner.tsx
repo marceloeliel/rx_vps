@@ -18,10 +18,16 @@ export function PWAInstallBanner() {
 
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Garantir que só renderiza no cliente
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Delay para mostrar a barra após 3 segundos
   useEffect(() => {
-    if (showInstallBanner) {
+    if (showInstallBanner && isMounted) {
       const timer = setTimeout(() => {
         setIsVisible(true)
         setIsAnimating(true)
@@ -29,7 +35,7 @@ export function PWAInstallBanner() {
 
       return () => clearTimeout(timer)
     }
-  }, [showInstallBanner])
+  }, [showInstallBanner, isMounted])
 
   const handleInstall = async () => {
     if (isIOS) {
@@ -67,7 +73,8 @@ export function PWAInstallBanner() {
     }, 300)
   }
 
-  if (!isVisible) return null
+  // Não renderizar no servidor para evitar problemas de hidratação
+  if (!isMounted || !isVisible) return null
 
   return (
     <>

@@ -173,9 +173,55 @@ export async function createLead(
 ): Promise<{ data: VehicleLead | null; error: any }> {
   const supabase = createClient()
 
+  // Validar parâmetros obrigatórios
+  if (!userId || !vehicleId || !agencyId || !leadType) {
+    const error = {
+      message: 'Parâmetros obrigatórios ausentes',
+      details: { userId: !!userId, vehicleId: !!vehicleId, agencyId: !!agencyId, leadType: !!leadType }
+    }
+    console.error('❌ [LEADS] Erro de validação:', error)
+    return { data: null, error }
+  }
+
   console.log('🎯 [LEADS] Criando lead:', { userId, vehicleId, agencyId, leadType })
 
   try {
+    // Verificar se já existe um lead similar (evitar duplicatas)
+    const { data: existingLead } = await supabase
+      .from('vehicle_leads')
+      .select('id, lead_type')
+      .eq('user_id', userId)
+      .eq('vehicle_id', vehicleId)
+      .maybeSingle()
+
+    if (existingLead) {
+      console.log('ℹ️ [LEADS] Lead já existe, atualizando tipo se necessário')
+      
+      // Se o tipo for diferente, atualizar
+      if (existingLead.lead_type !== leadType) {
+        const { data: updatedLead, error: updateError } = await supabase
+          .from('vehicle_leads')
+          .update({
+            lead_type: leadType,
+            contact_info: contactInfo || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingLead.id)
+          .select()
+          .single()
+        
+        if (updateError) {
+          console.error('❌ [LEADS] Erro ao atualizar lead:', updateError.message)
+          return { data: null, error: updateError }
+        }
+        
+        console.log('✅ [LEADS] Lead atualizado com sucesso:', updatedLead)
+        return { data: updatedLead, error: null }
+      }
+      
+      return { data: existingLead as VehicleLead, error: null }
+    }
+
     const { data, error } = await supabase
       .from('vehicle_leads')
       .insert({
@@ -183,21 +229,52 @@ export async function createLead(
         vehicle_id: vehicleId,
         agency_id: agencyId,
         lead_type: leadType,
-        contact_info: contactInfo
+        contact_info: contactInfo || null
       })
       .select()
       .single()
 
     if (error) {
-      console.error('❌ [LEADS] Erro ao criar lead:', error)
+      // Se for erro de duplicata, tentar buscar o lead existente
+      if (error.code === '23505' || error.message.includes('duplicate key')) {
+        console.log('ℹ️ [LEADS] Lead duplicado detectado, buscando existente')
+        const { data: existingData } = await supabase
+          .from('vehicle_leads')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('vehicle_id', vehicleId)
+          .single()
+        
+        if (existingData) {
+          return { data: existingData, error: null }
+        }
+      }
+      
+      console.error('❌ [LEADS] Erro ao criar lead:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
       return { data: null, error }
     }
 
     console.log('✅ [LEADS] Lead criado com sucesso:', data)
     return { data, error: null }
   } catch (error) {
-    console.error('❌ [LEADS] Erro inesperado:', error)
-    return { data: null, error }
+    const errorInfo = {
+      message: error instanceof Error ? error.message : 'Erro desconhecido',
+      stack: error instanceof Error ? error.stack : undefined,
+      userId,
+      vehicleId,
+      agencyId,
+      leadType,
+      errorType: typeof error,
+      errorString: String(error)
+    }
+    
+    console.error('❌ [LEADS] Erro inesperado ao criar lead:', errorInfo)
+    return { data: null, error: errorInfo }
   }
 }
 

@@ -3,6 +3,30 @@ import { createClient } from '@/lib/supabase/client'
 // Configurações dos planos
 const PLAN_CONFIGURATIONS = [
   {
+    plan_id: 'individual',
+    plan_name: 'Individual',
+    max_vehicles: 1,
+    max_featured_vehicles: 0,
+    storage_limit_mb: 50,
+    api_calls_per_month: 0,
+    can_create_basic_ads: false,
+    can_create_featured_ads: false,
+    can_create_premium_ads: false,
+    has_email_support: true,
+    has_phone_support: false,
+    has_whatsapp_support: false,
+    has_priority_support: false,
+    has_24_7_support: false,
+    has_basic_stats: false,
+    has_advanced_stats: false,
+    has_complete_stats: false,
+    has_custom_reports: false,
+    has_advanced_reports: false,
+    has_admin_panel: false,
+    has_api_access: false,
+    has_dedicated_consulting: false
+  },
+  {
     plan_id: 'basico',
     plan_name: 'Básico',
     max_vehicles: 5,

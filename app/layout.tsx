@@ -4,7 +4,8 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { Providers } from "@/components/providers"
-import { WhatsAppFloatButton } from "@/components/whatsapp-float-button"
+import { HydrationSafe } from "@/components/hydration-safe"
+
 import { TrialNotificationBar } from "@/components/trial-notification-bar"
 import { PageTransition } from "@/components/page-transition"
 
@@ -26,6 +27,34 @@ export const metadata: Metadata = {
     email: false,
     address: false,
     telephone: false,
+  },
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'RX AUTOS',
+    startupImage: [
+      {
+        url: '/images/pwa/icon-192x192.png',
+        media: '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)',
+      },
+    ],
+  },
+  icons: {
+    icon: [
+      { url: '/images/pwa/icon-72x72.png', sizes: '72x72', type: 'image/png' },
+      { url: '/images/pwa/icon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/images/pwa/icon-128x128.png', sizes: '128x128', type: 'image/png' },
+      { url: '/images/pwa/icon-144x144.png', sizes: '144x144', type: 'image/png' },
+      { url: '/images/pwa/icon-152x152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/images/pwa/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/images/pwa/icon-384x384.png', sizes: '384x384', type: 'image/png' },
+      { url: '/images/pwa/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/images/pwa/icon-152x152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/images/pwa/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
   },
   openGraph: {
     title: 'RX NEGOCIO | Conectando Agências de Carros com Compradores',
@@ -63,6 +92,12 @@ export const metadata: Metadata = {
   verification: {
     google: 'adicionar_codigo_verificacao_google',
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-title': 'RX AUTOS',
+  },
 }
 
 export const viewport: Viewport = {
@@ -84,16 +119,18 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
-        <Providers>
-          <div className="flex flex-col min-h-screen">
-            <TrialNotificationBar />
-            <main className="flex-grow">
-              <PageTransition>{children}</PageTransition>
-            </main>
-          </div>
-        </Providers>
-        <Toaster />
-        <WhatsAppFloatButton />
+        <HydrationSafe>
+          <Providers>
+            <div className="flex flex-col min-h-screen" suppressHydrationWarning>
+              <TrialNotificationBar />
+              <main className="flex-grow">
+                <PageTransition>{children}</PageTransition>
+              </main>
+            </div>
+          </Providers>
+          <Toaster />
+        </HydrationSafe>
+
         
         {/* Service Worker Script */}
         <script

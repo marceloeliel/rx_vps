@@ -155,9 +155,23 @@ export function useFipe({ tipoVeiculo, enableCache = true }: UseFipeOptions) {
             setCache(prev => ({ ...prev, [cacheKey]: anos }))
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erro ao carregar anos:', error)
-        setErrors(prev => ({ ...prev, anos: 'Erro ao carregar anos' }))
+        
+        // Tratamento de erros específicos
+        let errorMessage = 'Erro ao carregar anos'
+        
+        if (error.message?.includes('401')) {
+          errorMessage = 'Token de acesso inválido. Verifique a configuração'
+        } else if (error.message?.includes('404')) {
+          errorMessage = 'Modelo não encontrado ou não possui anos disponíveis'
+        } else if (error.message?.includes('429')) {
+          errorMessage = 'Muitas consultas. Aguarde alguns segundos e tente novamente'
+        } else if (error.message?.includes('500')) {
+          errorMessage = 'Erro no servidor FIPE. Tente novamente mais tarde'
+        }
+        
+        setErrors(prev => ({ ...prev, anos: errorMessage }))
       } finally {
         setLoading(prev => ({ ...prev, anos: false }))
       }
@@ -196,9 +210,24 @@ export function useFipe({ tipoVeiculo, enableCache = true }: UseFipeOptions) {
       const valorFipe = formatarPrecoFipe(precoFipe.price)
       
       setData(prev => ({ ...prev, precoFipe, valorFipe }))
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao buscar preço FIPE:', error)
-      setErrors(prev => ({ ...prev, preco: 'Erro ao buscar preço FIPE' }))
+      
+      // Tentar extrair mensagem de erro mais específica
+      let errorMessage = 'Erro ao buscar preço FIPE'
+      if (error.message?.includes('401')) {
+        errorMessage = 'Token de API inválido. Tente novamente mais tarde.'
+      } else if (error.message?.includes('404')) {
+        errorMessage = 'Veículo não encontrado na tabela FIPE'
+      } else if (error.message?.includes('429')) {
+        errorMessage = 'Muitas consultas. Aguarde um momento e tente novamente.'
+      } else if (error.message?.includes('500')) {
+        errorMessage = 'Erro no servidor FIPE. Tente novamente mais tarde.'
+      } else if (error.message?.includes('Dados do veículo não encontrados')) {
+        errorMessage = 'Dados do veículo não encontrados na tabela FIPE. Verifique se os dados estão corretos.'
+      }
+      
+      setErrors(prev => ({ ...prev, preco: errorMessage }))
     } finally {
       setLoading(prev => ({ ...prev, preco: false }))
     }
@@ -226,4 +255,4 @@ export function useFipe({ tipoVeiculo, enableCache = true }: UseFipeOptions) {
     mapearCombustivelFipe,
     resetarSelecoes
   }
-} 
+}

@@ -1,0 +1,80 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1280" height="720" fill="#ffffff"/>
+  
+  <!-- Header -->
+  <rect width="1280" height="80" fill="#f97316"/>
+  <text x="100" y="45" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">RX AUTOS</text>
+  
+  <!-- Navigation -->
+  <text x="300" y="45" fill="white" font-family="Arial, sans-serif" font-size="16">Veículos</text>
+  <text x="400" y="45" fill="white" font-family="Arial, sans-serif" font-size="16">Agências</text>
+  <text x="500" y="45" fill="white" font-family="Arial, sans-serif" font-size="16">Simulador</text>
+  <text x="600" y="45" fill="white" font-family="Arial, sans-serif" font-size="16">Planos</text>
+  
+  <!-- Login Button -->
+  <rect x="1100" y="25" width="100" height="30" rx="15" fill="white"/>
+  <text x="1150" y="45" text-anchor="middle" fill="#f97316" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Entrar</text>
+  
+  <!-- Hero Section -->
+  <rect x="0" y="80" width="1280" height="200" fill="linear-gradient(135deg, #f97316 0%, #dc2626 100%)"/>
+  <text x="640" y="150" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="32" font-weight="bold">Encontre o Veículo Perfeito</text>
+  <text x="640" y="180" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="18">Conectamos você aos melhores negócios automotivos</text>
+  
+  <!-- Search Bar -->
+  <rect x="340" y="220" width="600" height="50" rx="25" fill="white" stroke="#e5e7eb"/>
+  <text x="370" y="250" fill="#6b7280" font-family="Arial, sans-serif" font-size="16">Buscar por marca, modelo ou cidade...</text>
+  <rect x="880" y="230" width="50" height="30" rx="15" fill="#f97316"/>
+  <text x="905" y="250" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14">🔍</text>
+  
+  <!-- Vehicle Grid -->
+  <g>
+    <!-- Row 1 -->
+    <rect x="100" y="320" width="280" height="250" rx="12" fill="white" stroke="#e5e7eb"/>
+    <rect x="110" y="330" width="260" height="160" rx="8" fill="#f3f4f6"/>
+    <rect x="180" y="380" width="120" height="60" rx="4" fill="#f97316"/>
+    <text x="240" y="415" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">CARRO</text>
+    <text x="110" y="520" fill="#1f2937" font-family="Arial, sans-serif" font-size="18" font-weight="bold">Honda Civic 2023</text>
+    <text x="110" y="545" fill="#f97316" font-family="Arial, sans-serif" font-size="16" font-weight="bold">R$ 85.000</text>
+    
+    <rect x="400" y="320" width="280" height="250" rx="12" fill="white" stroke="#e5e7eb"/>
+    <rect x="410" y="330" width="260" height="160" rx="8" fill="#f3f4f6"/>
+    <rect x="480" y="380" width="120" height="60" rx="4" fill="#f97316"/>
+    <text x="540" y="415" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">CARRO</text>
+    <text x="410" y="520" fill="#1f2937" font-family="Arial, sans-serif" font-size="18" font-weight="bold">Toyota Corolla 2022</text>
+    <text x="410" y="545" fill="#f97316" font-family="Arial, sans-serif" font-size="16" font-weight="bold">R$ 78.000</text>
+    
+    <rect x="700" y="320" width="280" height="250" rx="12" fill="white" stroke="#e5e7eb"/>
+    <rect x="710" y="330" width="260" height="160" rx="8" fill="#f3f4f6"/>
+    <rect x="780" y="380" width="120" height="60" rx="4" fill="#f97316"/>
+    <text x="840" y="415" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">CARRO</text>
+    <text x="710" y="520" fill="#1f2937" font-family="Arial, sans-serif" font-size="18" font-weight="bold">Volkswagen Jetta 2023</text>
+    <text x="710" y="545" fill="#f97316" font-family="Arial, sans-serif" font-size="16" font-weight="bold">R$ 92.000</text>
+    
+    <rect x="1000" y="320" width="280" height="250" rx="12" fill="white" stroke="#e5e7eb"/>
+    <rect x="1010" y="330" width="260" height="160" rx="8" fill="#f3f4f6"/>
+    <rect x="1080" y="380" width="120" height="60" rx="4" fill="#f97316"/>
+    <text x="1140" y="415" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">CARRO</text>
+    <text x="1010" y="520" fill="#1f2937" font-family="Arial, sans-serif" font-size="18" font-weight="bold">BMW 320i 2023</text>
+    <text x="1010" y="545" fill="#f97316" font-family="Arial, sans-serif" font-size="16" font-weight="bold">R$ 165.000</text>
+  </g>
+  
+  <!-- PWA Install Banner (Desktop) -->
+  <rect x="900" y="600" width="350" height="100" rx="12" fill="url(#gradient)" fill-opacity="0.95"/>
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <text x="1075" y="630" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">💻 Instalar RX AUTOS</text>
+  <text x="1075" y="650" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14">Acesso rápido da área de trabalho</text>
+  <rect x="960" y="665" width="100" height="25" rx="12" fill="white"/>
+  <text x="1010" y="682" text-anchor="middle" fill="#f97316" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Instalar App</text>
+  <rect x="1120" y="665" width="80" height="25" rx="12" fill="rgba(255,255,255,0.2)"/>
+  <text x="1160" y="682" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="12">Depois</text>
+  
+  <!-- Footer -->
+  <rect x="0" y="680" width="1280" height="40" fill="#1f2937"/>
+  <text x="640" y="705" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14">© 2024 RX AUTOS - Conectando você ao veículo perfeito</text>
+</svg>

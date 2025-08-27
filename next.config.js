@@ -11,6 +11,14 @@ const nextConfig = {
     scrollRestoration: true,
   },
   
+  // Suprimir avisos de hidratação específicos
+  onDemandEntries: {
+    // Período em ms para manter as páginas em memória
+    maxInactiveAge: 25 * 1000,
+    // Número de páginas que devem ser mantidas simultaneamente
+    pagesBufferLength: 2,
+  },
+  
   // Configurações de webpack simplificadas
   webpack: (config, { isServer }) => {
     // Resolver fallbacks para client-side

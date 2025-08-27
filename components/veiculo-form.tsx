@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { useFipe } from "@/hooks/use-fipe"
+import { extrairAnoDoCodigo } from "@/lib/fipe-api"
 import {
   createVeiculo,
   updateVeiculo,
@@ -40,6 +41,7 @@ export default function VeiculoForm({ veiculo, isEditing = false }: VeiculoFormP
   const [loading, setLoading] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = 4
+  const [usarFipe, setUsarFipe] = useState(true) // Controla se usa FIPE ou cadastro manual
 
   const [formData, setFormData] = useState<VeiculoFormData>({
     // Informações básicas
@@ -51,8 +53,8 @@ export default function VeiculoForm({ veiculo, isEditing = false }: VeiculoFormP
     codigo_fipe: veiculo?.codigo_fipe || "",
 
     // Especificações técnicas
-    ano_fabricacao: veiculo?.ano_fabricacao || new Date().getFullYear(),
-    ano_modelo: veiculo?.ano_modelo || new Date().getFullYear(),
+    ano_fabricacao: veiculo?.ano_fabricacao || 0,
+    ano_modelo: veiculo?.ano_modelo || 0,
     quilometragem: veiculo?.quilometragem || 0,
     cor: veiculo?.cor || "",
     combustivel: veiculo?.combustivel || "",
@@ -113,6 +115,7 @@ export default function VeiculoForm({ veiculo, isEditing = false }: VeiculoFormP
     handleAnoChange,
     buscarPreco,
     mapearCombustivelFipe,
+    resetarSelecoes,
   } = useFipe({ 
     tipoVeiculo: formData.tipo_veiculo,
     enableCache: true 
@@ -159,18 +162,26 @@ export default function VeiculoForm({ veiculo, isEditing = false }: VeiculoFormP
 
   const validateStep = (step: number): boolean => {
     const newErrors: Record<string, string> = {}
-    const anoAtual = 2024 // Valor fixo para evitar erro de hidratação
+    const anoAtual = 2025 // Valor fixo para evitar erro de hidratação
 
     if (step === 1) {
       if (!formData.tipo_veiculo) newErrors.tipo_veiculo = "Tipo de veículo é obrigatório"
       if (!formData.marca_nome) newErrors.marca_nome = "Marca é obrigatória"
       if (!formData.modelo_nome) newErrors.modelo_nome = "Modelo é obrigatório"
       if (!formData.titulo) newErrors.titulo = "Título é obrigatório"
-      if (formData.ano_fabricacao < 1900 || formData.ano_fabricacao > anoAtual + 1) {
+      // Validar anos apenas se foram preenchidos (diferentes de 0)
+      if (formData.ano_fabricacao !== 0 && (formData.ano_fabricacao < 1900 || formData.ano_fabricacao > anoAtual + 1)) {
         newErrors.ano_fabricacao = "Ano de fabricação inválido"
       }
-      if (formData.ano_modelo < 1900 || formData.ano_modelo > anoAtual + 1) {
+      if (formData.ano_modelo !== 0 && (formData.ano_modelo < 1900 || formData.ano_modelo > anoAtual + 1)) {
         newErrors.ano_modelo = "Ano do modelo inválido"
+      }
+      // Validar se os anos foram preenchidos (obrigatórios)
+      if (formData.ano_fabricacao === 0) {
+        newErrors.ano_fabricacao = "Ano de fabricação é obrigatório"
+      }
+      if (formData.ano_modelo === 0) {
+        newErrors.ano_modelo = "Ano do modelo é obrigatório"
       }
     }
 
@@ -207,34 +218,94 @@ export default function VeiculoForm({ veiculo, isEditing = false }: VeiculoFormP
 
   // Handler para mudança de marca FIPE
   const handleMarcaFipeChange = (codigoMarca: string) => {
-    handleMarcaChange(codigoMarca)
-    // Limpar campos dependentes
+    if (usarFipe) {
+      handleMarcaChange(codigoMarca)
+      // Limpar campos dependentes
+      setFormData(prev => ({
+        ...prev,
+        modelo_nome: "",
+        ano_fabricacao: 0,
+        ano_modelo: 0,
+        combustivel: "",
+        codigo_fipe: "",
+      }))
+    }
+  }
+
+  // Handler para mudança de marca manual
+  const handleMarcaManualChange = (marca: string) => {
     setFormData(prev => ({
       ...prev,
+      marca_nome: marca,
       modelo_nome: "",
-      ano_fabricacao: 0,
-      ano_modelo: 0,
-      combustivel: "",
       codigo_fipe: "",
     }))
   }
 
+  // Usar a função resetarSelecoes do hook useFipe
+  // (já está disponível através do hook)
+
+  // Handler para alternar entre FIPE e manual
+  const handleToggleFipe = (usar: boolean) => {
+    setUsarFipe(usar)
+    // Resetar dados relacionados à FIPE
+    if (!usar) {
+      resetarSelecoes()
+      setFormData(prev => ({
+        ...prev,
+        marca_nome: "",
+        modelo_nome: "",
+        codigo_fipe: "",
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        marca_nome: "",
+        modelo_nome: "",
+        codigo_fipe: "",
+      }))
+    }
+  }
+
   // Handler para mudança de modelo FIPE
   const handleModeloFipeChange = (codigoModelo: string) => {
-    handleModeloChange(codigoModelo)
-    // Limpar campos dependentes
+    if (usarFipe) {
+      handleModeloChange(codigoModelo)
+      // Limpar campos dependentes
+      setFormData(prev => ({
+        ...prev,
+        ano_fabricacao: 0,
+        ano_modelo: 0,
+        combustivel: "",
+        codigo_fipe: "",
+      }))
+    }
+  }
+
+  // Handler para mudança de modelo manual
+  const handleModeloManualChange = (modelo: string) => {
     setFormData(prev => ({
       ...prev,
-      ano_fabricacao: 0,
-      ano_modelo: 0,
-      combustivel: "",
+      modelo_nome: modelo,
       codigo_fipe: "",
     }))
   }
 
   // Handler para mudança de ano FIPE
   const handleAnoFipeChange = (codigoAno: string) => {
-    handleAnoChange(codigoAno)
+    if (usarFipe) {
+      handleAnoChange(codigoAno)
+      
+      // Extrair ano do código e aplicar ao formulário
+      const anoExtraido = extrairAnoDoCodigo(codigoAno)
+      setFormData(prev => ({
+        ...prev,
+        ano_fabricacao: anoExtraido,
+        ano_modelo: anoExtraido,
+        combustivel: "",
+        codigo_fipe: "",
+      }))
+    }
   }
 
   const handleNextStep = () => {
@@ -410,38 +481,92 @@ export default function VeiculoForm({ veiculo, isEditing = false }: VeiculoFormP
                     )}
                   </div>
 
-                  {/* Marca FIPE */}
+                  {/* Opção de usar FIPE ou cadastro manual */}
+                  {formData.tipo_veiculo && (
+                    <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200 md:col-span-2">
+                      <div className="flex items-center gap-2">
+                        <Settings className="h-4 w-4 text-blue-600" />
+                        <Label className="text-sm font-medium text-blue-800">Método de Cadastro</Label>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            id="usar-fipe"
+                            name="metodo-cadastro"
+                            checked={usarFipe}
+                            onChange={() => handleToggleFipe(true)}
+                            className="text-blue-600"
+                          />
+                          <Label htmlFor="usar-fipe" className="text-sm cursor-pointer">
+                            🔍 Usar Tabela FIPE (recomendado)
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            id="cadastro-manual"
+                            name="metodo-cadastro"
+                            checked={!usarFipe}
+                            onChange={() => handleToggleFipe(false)}
+                            className="text-blue-600"
+                          />
+                          <Label htmlFor="cadastro-manual" className="text-sm cursor-pointer">
+                            ✏️ Cadastro Manual
+                          </Label>
+                        </div>
+                      </div>
+                      <p className="text-xs text-blue-600">
+                        {usarFipe 
+                          ? "Os dados serão preenchidos automaticamente com base na tabela FIPE."
+                          : "Você poderá inserir marca e modelo manualmente caso não encontre na tabela FIPE."
+                        }
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Marca - FIPE ou Manual */}
                   <div className="space-y-2">
                     <Label htmlFor="marca">Marca *</Label>
-                    <Select
-                      value={selectedMarca}
-                      onValueChange={handleMarcaFipeChange}
-                      disabled={!formData.tipo_veiculo}
-                    >
-                      <SelectTrigger className={errors.marca_nome ? "border-red-500" : ""}>
-                        <SelectValue placeholder="Selecione a marca" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fipeLoading.marcas ? (
-                          <SelectItem value="loading-marcas" disabled>
-                            <div className="flex items-center gap-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Carregando marcas...
-                            </div>
-                          </SelectItem>
-                        ) : fipeErrors.marcas ? (
-                          <SelectItem value="error-marcas" disabled>
-                            Erro: {fipeErrors.marcas}
-                          </SelectItem>
-                        ) : (
-                          fipeData.marcas.map((marca) => (
-                            <SelectItem key={marca.code} value={marca.code}>
-                              {marca.name}
+                    {usarFipe ? (
+                      <Select
+                        value={selectedMarca}
+                        onValueChange={handleMarcaFipeChange}
+                        disabled={!formData.tipo_veiculo}
+                      >
+                        <SelectTrigger className={errors.marca_nome ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Selecione a marca" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fipeLoading.marcas ? (
+                            <SelectItem value="loading-marcas" disabled>
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Carregando marcas...
+                              </div>
                             </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                          ) : fipeErrors.marcas ? (
+                            <SelectItem value="error-marcas" disabled>
+                              Erro: {fipeErrors.marcas}
+                            </SelectItem>
+                          ) : (
+                            fipeData.marcas.map((marca) => (
+                              <SelectItem key={marca.code} value={marca.code}>
+                                {marca.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="marca"
+                        value={formData.marca_nome}
+                        onChange={(e) => handleMarcaManualChange(e.target.value)}
+                        placeholder="Digite a marca do veículo"
+                        className={errors.marca_nome ? "border-red-500" : ""}
+                      />
+                    )}
                     {errors.marca_nome && (
                       <p className="text-sm text-red-600 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
@@ -450,38 +575,49 @@ export default function VeiculoForm({ veiculo, isEditing = false }: VeiculoFormP
                     )}
                   </div>
 
-                  {/* Modelo FIPE */}
+                  {/* Modelo - FIPE ou Manual */}
                   <div className="space-y-2">
                     <Label htmlFor="modelo">Modelo *</Label>
-                    <Select
-                      value={selectedModelo}
-                      onValueChange={handleModeloFipeChange}
-                      disabled={!selectedMarca}
-                    >
-                      <SelectTrigger className={errors.modelo_nome ? "border-red-500" : ""}>
-                        <SelectValue placeholder="Selecione o modelo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fipeLoading.modelos ? (
-                          <SelectItem value="loading-modelos" disabled>
-                            <div className="flex items-center gap-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Carregando modelos...
-                            </div>
-                          </SelectItem>
-                        ) : fipeErrors.modelos ? (
-                          <SelectItem value="error-modelos" disabled>
-                            Erro: {fipeErrors.modelos}
-                          </SelectItem>
-                        ) : (
-                          fipeData.modelos.map((modelo) => (
-                            <SelectItem key={modelo.code} value={modelo.code}>
-                              {modelo.name}
+                    {usarFipe ? (
+                      <Select
+                        value={selectedModelo}
+                        onValueChange={handleModeloFipeChange}
+                        disabled={!selectedMarca}
+                      >
+                        <SelectTrigger className={errors.modelo_nome ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Selecione o modelo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fipeLoading.modelos ? (
+                            <SelectItem value="loading-modelos" disabled>
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Carregando modelos...
+                              </div>
                             </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                          ) : fipeErrors.modelos ? (
+                            <SelectItem value="error-modelos" disabled>
+                              Erro: {fipeErrors.modelos}
+                            </SelectItem>
+                          ) : (
+                            fipeData.modelos.map((modelo) => (
+                              <SelectItem key={modelo.code} value={modelo.code}>
+                                {modelo.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="modelo"
+                        value={formData.modelo_nome}
+                        onChange={(e) => handleModeloManualChange(e.target.value)}
+                        placeholder="Digite o modelo do veículo"
+                        className={errors.modelo_nome ? "border-red-500" : ""}
+                        disabled={!formData.marca_nome}
+                      />
+                    )}
                     {errors.modelo_nome && (
                       <p className="text-sm text-red-600 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
@@ -490,63 +626,112 @@ export default function VeiculoForm({ veiculo, isEditing = false }: VeiculoFormP
                     )}
                   </div>
 
-                  {/* Ano FIPE */}
+                  {/* Ano - FIPE ou Manual */}
                   <div className="space-y-2">
                     <Label htmlFor="ano">Ano *</Label>
-                    <Select
-                      value={selectedAno}
-                      onValueChange={handleAnoFipeChange}
-                      disabled={!selectedModelo}
-                    >
-                      <SelectTrigger className={errors.ano_fabricacao ? "border-red-500" : ""}>
-                        <SelectValue placeholder="Selecione o ano" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fipeLoading.anos ? (
-                          <SelectItem value="loading-anos" disabled>
-                            <div className="flex items-center gap-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Carregando anos...
-                            </div>
-                          </SelectItem>
-                        ) : fipeErrors.anos ? (
-                          <SelectItem value="error-anos" disabled>
-                            Erro: {fipeErrors.anos}
-                          </SelectItem>
-                        ) : (
-                          fipeData.anos.map((ano) => (
-                            <SelectItem key={ano.code} value={ano.code}>
-                              {ano.name}
+                    {usarFipe ? (
+                      <Select
+                        value={selectedAno}
+                        onValueChange={handleAnoFipeChange}
+                        disabled={!selectedModelo}
+                      >
+                        <SelectTrigger className={errors.ano_fabricacao ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Selecione o ano" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fipeLoading.anos ? (
+                            <SelectItem value="loading-anos" disabled>
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Carregando anos...
+                              </div>
                             </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                          ) : fipeErrors.anos ? (
+                            <SelectItem value="error-anos" disabled>
+                              Erro: {fipeErrors.anos}
+                            </SelectItem>
+                          ) : (
+                            fipeData.anos.map((ano) => (
+                              <SelectItem key={ano.code} value={ano.code}>
+                                {ano.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label htmlFor="ano_fabricacao" className="text-xs">Ano Fabricação</Label>
+                          <Input
+                            id="ano_fabricacao"
+                            type="number"
+                            value={formData.ano_fabricacao === 0 ? "" : formData.ano_fabricacao}
+                            onChange={(e) => handleInputChange("ano_fabricacao", e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                            placeholder="2025"
+                            min="1900"
+                            max="2026"
+                            className={errors.ano_fabricacao ? "border-red-500" : ""}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="ano_modelo" className="text-xs">Ano Modelo</Label>
+                          <Input
+                            id="ano_modelo"
+                            type="number"
+                            value={formData.ano_modelo === 0 ? "" : formData.ano_modelo}
+                            onChange={(e) => handleInputChange("ano_modelo", e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                            placeholder="2025"
+                            min="1900"
+                            max="2026"
+                            className={errors.ano_modelo ? "border-red-500" : ""}
+                          />
+                        </div>
+                      </div>
+                    )}
                     {errors.ano_fabricacao && (
                       <p className="text-sm text-red-600 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
                         {errors.ano_fabricacao}
                       </p>
                     )}
-                  </div>
-
-                  {/* Código FIPE (preenchido automaticamente) */}
-                  <div className="space-y-2">
-                    <Label htmlFor="codigo_fipe">Código FIPE</Label>
-                    <Input
-                      id="codigo_fipe"
-                      value={formData.codigo_fipe}
-                      onChange={(e) => handleInputChange("codigo_fipe", e.target.value)}
-                      placeholder="Preenchido automaticamente"
-                      readOnly
-                      className="bg-gray-50"
-                    />
-                    {fipeData.precoFipe && (
-                      <div className="text-xs text-green-600">
-                        Valor FIPE: {fipeData.precoFipe.price}
-                      </div>
+                    {errors.ano_modelo && (
+                      <p className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.ano_modelo}
+                      </p>
                     )}
                   </div>
+
+                  {/* Código FIPE e informações */}
+                  {usarFipe ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="codigo_fipe">Código FIPE</Label>
+                      <Input
+                        id="codigo_fipe"
+                        value={formData.codigo_fipe}
+                        onChange={(e) => handleInputChange("codigo_fipe", e.target.value)}
+                        placeholder="Preenchido automaticamente"
+                        readOnly
+                        className="bg-gray-50"
+                      />
+                      {fipeData.precoFipe && (
+                        <div className="text-xs text-green-600">
+                          Valor FIPE: {fipeData.precoFipe.price}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-yellow-600" />
+                        <Label className="text-sm font-medium text-yellow-800">Cadastro Manual</Label>
+                      </div>
+                      <p className="text-xs text-yellow-700">
+                        Você está cadastrando manualmente. O código FIPE não será preenchido automaticamente.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="titulo">Título do Anúncio *</Label>

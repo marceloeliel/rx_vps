@@ -22,6 +22,7 @@ import {
   Fuel,
   User,
   LogOut,
+  Plus,
 } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -34,6 +35,129 @@ import { LocationBadge } from "@/components/location-badge"
 import PaidAdsSection from "@/components/PaidAdsSection"
 import { useSubscription } from "@/hooks/use-subscription"
 import { TrialCounter } from "@/components/trial-counter"
+import { AuthGuard } from "@/components/auth-guard"
+import { useTrial } from "@/hooks/use-trial"
+
+// Componente do carrossel móvel de categorias
+function MobileCategoriesCarousel() {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [isTransitioning, setIsTransitioning] = useState(true)
+  const categories = [
+    { name: "Carros elétricos", image: "https://s2-autoesporte.glbimg.com/AF9s1Xm_Y85ejgJ3l6Ssz_vQlxY=/0x0:1920x1280/888x0/smart/filters:strip_icc()/i.s3.glbimg.com/v1/AUTH_cf9d035bf26b4646b105bd958f32089d/internal_photos/bs/2023/i/u/Y6RhJBSZu5wBqzisBngw/link-1-.jpg" },
+    { name: "Hatches", image: "https://123carros.com.br/files/wp-content/uploads/2018/01/hatch-620x445.jpg" },
+    { name: "Picapes", image: "https://cdn.autopapo.com.br/box/uploads/2020/02/17174829/nova-ram-2500-2020-dianteira-732x488.jpeg" },
+    { name: "Sedans", image: "https://i.bstr.es/drivingeco/2020/07/toyota-corolla-sedan-GR-7.jpg" },
+    { name: "SUVs", image: "https://mundodoautomovelparapcd.com.br/wp-content/uploads/2024/12/Chevrolet-Equinox-Activ-2025-6-1024x576.jpg" },
+  ]
+
+  // Duplicar categorias para carrossel infinito
+  const infiniteCategories = [...categories, ...categories]
+
+  // Auto-scroll effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prevIndex) => {
+        const nextIndex = prevIndex + 1
+        // Quando chegar no final das categorias duplicadas, resetar para o início
+        if (nextIndex >= categories.length * 2) {
+          // Desabilitar transição temporariamente para reset instantâneo
+          setTimeout(() => {
+            setIsTransitioning(false)
+            setCurrentIndex(0)
+            // Reabilitar transição após reset
+            setTimeout(() => setIsTransitioning(true), 50)
+          }, 500)
+          return nextIndex
+        }
+        return nextIndex
+      })
+    }, 3000) // Muda a cada 3 segundos
+
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleIndicatorClick = (index: number) => {
+    setIsTransitioning(true)
+    setCurrentIndex(index)
+  }
+
+  return (
+    <div className="sm:hidden overflow-hidden">
+      <div 
+        className={`flex gap-3 pb-4 ${isTransitioning ? 'transition-transform duration-500 ease-in-out' : ''}`}
+        style={{
+          transform: `translateX(-${currentIndex * (144 + 12)}px)`, // 144px width + 12px gap
+        }}
+      >
+        {infiniteCategories.map((category, index) => (
+          <div key={`${category.name}-${index}`} className="relative rounded-lg overflow-hidden cursor-pointer group flex-shrink-0 w-36">
+            <Image
+              src={category.image || "/placeholder.svg"}
+              alt={category.name}
+              width={144}
+              height={112}
+              className="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            <div className="absolute bottom-2 left-2">
+              <h3 className="text-white font-bold text-sm">{category.name}</h3>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Indicadores */}
+      <div className="flex justify-center gap-2 mt-2">
+        {categories.map((_, index) => (
+          <button
+            key={index}
+            className={`w-2 h-2 rounded-full transition-colors duration-300 ${
+              (currentIndex % categories.length) === index ? 'bg-blue-600' : 'bg-gray-300'
+            }`}
+            onClick={() => handleIndicatorClick(index)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Componente do carrossel móvel de carros mais buscados
+function MobileCarsCarousel() {
+  const cars = [
+    { brand: "HONDA", model: "CIVIC", image: "https://www.pngkey.com/png/full/872-8726768_the-honda-summer-rollout-sales-event-honda-civic.png" },
+    { brand: "TOYOTA", model: "COROLLA", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiKNowgBLlcTMxKwzkoiaPj14EZKcliGB86Xsfx8GBafj1zmcpWQAM9QHMj2FVMPuLOeDRNro7LYa9Cj3m1QyIhVTwmPPdsdturycsLTpmxLB-D4ZU_Bb6yU5TVhD1YgZYklKXLzzLh07Hn/s1600/20160425_gli_ubp.jpg" },
+    { brand: "HONDA", model: "FIT", image: "https://production.autoforce.com/uploads/version/profile_image/5648/comprar-ex_caf6a84fe7.png" },
+    { brand: "VOLKSWAGEN", model: "GOL", image: "https://d3a74cgiihgn4m.cloudfront.net/2020/volkswagen/gol/high_res/1080238508177.png" },
+    { brand: "VOLKSWAGEN", model: "GOLF", image: "https://clickpetroleoegas.com.br/wp-content/uploads/2024/11/volkswagen-golf-Comfortline-carro-usado.png" },
+    { brand: "VOLKSWAGEN", model: "JETTA", image: "https://assets.volkswagen.com/is/image/volkswagenag/JETTA_23_GLI_3_4_FRENTE_VERMELHO_16_9_1920x1080px?Zml0PWNyb3AsMSZmbXQ9cG5nJndpZD04MDAmYWxpZ249MC4wMCwwLjAwJmJmYz1vZmYmYzRiMA==" },
+  ]
+
+  return (
+    <div className="sm:hidden">
+      <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide">
+        {cars.map((car, index) => (
+          <Card key={index} className="hover:shadow-lg transition-shadow cursor-pointer flex-shrink-0 w-36">
+            <CardContent className="p-3">
+              <div className="text-center mb-2">
+                <div className="text-xs font-medium text-gray-900">{car.brand}</div>
+                <div className="text-sm font-bold text-red-600">{car.model}</div>
+              </div>
+              <Image
+                src={car.image || "/placeholder.svg"}
+                alt={`${car.brand} ${car.model}`}
+                width={144}
+                height={90}
+                className="w-full h-20 object-contain rounded"
+              />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // import { TrialDebug } from "@/components/trial-debug"
 
 export default function HomePage() {
@@ -54,13 +178,16 @@ export default function HomePage() {
   
   // Hook para verificar plano de assinatura
   const { subscriptionStatus, profile } = useSubscription()
+  
+  // Hook para verificar período de teste
+  const { isInTrial } = useTrial()
 
   // Verificar se deve ocultar a seção de agências
   const shouldHideAgencySection = () => {
-    // Verifica se o usuário é uma agência com plano ativo
+    // Verifica se o usuário é uma agência com plano ativo OU em período de teste
     return profile && 
            profile.tipo_usuario === 'agencia' && 
-           subscriptionStatus?.isActive
+           (subscriptionStatus?.isActive || isInTrial)
   }
 
   // Função para verificar se o veículo é novo (menos de 7 dias)
@@ -84,7 +211,7 @@ export default function HomePage() {
     },
     {
       id: "fallback-2",
-      url: "/images/luxury-car-2.png",
+      url: "https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=1200&h=600&fit=crop&crop=center",
       titulo: "Lamborghini Huracan",
       descricao: "Lamborghini Huracan amarela em cidade moderna",
       ordem: 2,
@@ -92,7 +219,7 @@ export default function HomePage() {
     },
     {
       id: "fallback-3",
-      url: "/images/luxury-car-3.png",
+      url: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200&h=600&fit=crop&crop=center",
       titulo: "Porsche 911 Turbo S",
       descricao: "Porsche 911 Turbo S prata em pista de corrida",
       ordem: 3,
@@ -238,7 +365,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <AuthGuard requireAuth={false} showLoader={false}>
+      <div className="min-h-screen bg-white">
       {/* Header */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 text-white px-4 py-4 transition-all duration-300 ${
@@ -622,6 +750,33 @@ export default function HomePage() {
       </section>
       )}
       
+      {/* Banner Cadastro de Veículos - Apenas para agências e vendedores logados */}
+      {!loadingUser && user && profile && (profile.tipo_usuario === 'agencia' || profile.tipo_usuario === 'vendedor') && (
+        <section className="py-6">
+          <div className="w-full">
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 sm:p-8 text-white shadow-lg">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-center sm:text-left">
+                  <h3 className="text-xl sm:text-2xl font-bold mb-2">
+                    Cadastre seus veículos e alcance mais clientes
+                  </h3>
+                  <p className="text-white/90 text-sm sm:text-base">
+                    Publique seus anúncios e conecte-se com milhares de compradores interessados
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <Link href="/cadastro-veiculo">
+                    <Button className="bg-white text-orange-600 hover:bg-orange-50 px-6 py-3 text-base font-semibold shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                      Cadastrar Veículo
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Featured Vehicles */}
       <section className="py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4">
@@ -647,7 +802,7 @@ export default function HomePage() {
                       alt={`${veiculo.marca_nome} ${veiculo.modelo_nome} ${veiculo.ano_fabricacao}`}
                       width={300}
                       height={200}
-                      className="w-full h-28 object-cover"
+                      className="w-full h-40 sm:h-48 sm:object-cover object-contain bg-gray-50"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
                         target.src = "/placeholder.svg?height=200&width=300&text=Erro+ao+carregar"
@@ -891,7 +1046,8 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4">
           <h2 className="text-2xl font-bold text-gray-900 mb-8">Categorias</h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* Desktop Grid - Hidden on mobile */}
+          <div className="hidden sm:grid grid-cols-3 lg:grid-cols-5 gap-4">
             {[
               { name: "Carros elétricos", image: "https://s2-autoesporte.glbimg.com/AF9s1Xm_Y85ejgJ3l6Ssz_vQlxY=/0x0:1920x1280/888x0/smart/filters:strip_icc()/i.s3.glbimg.com/v1/AUTH_cf9d035bf26b4646b105bd958f32089d/internal_photos/bs/2023/i/u/Y6RhJBSZu5wBqzisBngw/link-1-.jpg" },
               { name: "Hatches", image: "https://123carros.com.br/files/wp-content/uploads/2018/01/hatch-620x445.jpg" },
@@ -914,6 +1070,9 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+
+          {/* Mobile Carousel - Visible only on mobile */}
+          <MobileCategoriesCarousel />
         </div>
       </section>
 
@@ -922,14 +1081,15 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4">
           <h2 className="text-2xl font-bold text-gray-900 mb-8">Carros mais buscados</h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+          {/* Desktop Grid - Hidden on mobile */}
+          <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
             {[
               { brand: "HONDA", model: "CIVIC", image: "https://www.pngkey.com/png/full/872-8726768_the-honda-summer-rollout-sales-event-honda-civic.png" },
               { brand: "TOYOTA", model: "COROLLA", image: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiKNowgBLlcTMxKwzkoiaPj14EZKcliGB86Xsfx8GBafj1zmcpWQAM9QHMj2FVMPuLOeDRNro7LYa9Cj3m1QyIhVTwmPPdsdturycsLTpmxLB-D4ZU_Bb6yU5TVhD1YgZYklKXLzzLh07Hn/s1600/20160425_gli_ubp.jpg" },
               { brand: "HONDA", model: "FIT", image: "https://production.autoforce.com/uploads/version/profile_image/5648/comprar-ex_caf6a84fe7.png" },
               { brand: "VOLKSWAGEN", model: "GOL", image: "https://d3a74cgiihgn4m.cloudfront.net/2020/volkswagen/gol/high_res/1080238508177.png" },
               { brand: "VOLKSWAGEN", model: "GOLF", image: "https://clickpetroleoegas.com.br/wp-content/uploads/2024/11/volkswagen-golf-Comfortline-carro-usado.png" },
-              { brand: "VOLKSWAGEN", model: "JETTA", image: "https://volkswagenpampa.com.br/wp-content/uploads/2023/01/VW_Novos_Jetta_GLI.png" },
+              { brand: "VOLKSWAGEN", model: "JETTA", image: "https://assets.volkswagen.com/is/image/volkswagenag/JETTA_23_GLI_3_4_FRENTE_VERMELHO_16_9_1920x1080px?Zml0PWNyb3AsMSZmbXQ9cG5nJndpZD04MDAmYWxpZ249MC4wMCwwLjAwJmJmYz1vZmYmYzRiMA==" },
             ].map((car, index) => (
               <Card key={index} className="hover:shadow-lg transition-shadow cursor-pointer">
                 <CardContent className="p-4">
@@ -948,6 +1108,9 @@ export default function HomePage() {
               </Card>
             ))}
           </div>
+
+          {/* Mobile Carousel - Visible only on mobile */}
+          <MobileCarsCarousel />
         </div>
       </section>
 
@@ -1166,6 +1329,8 @@ export default function HomePage() {
         />
       )}
       {/* <TrialDebug /> */}
-    </div>
+      
+      </div>
+    </AuthGuard>
   )
 }

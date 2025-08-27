@@ -63,6 +63,7 @@ import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 import { TrialCounter } from "@/components/trial-counter"
 import { UserPlanDetails } from "@/components/user-plan-details"
+import { RequireAuth } from "@/components/auth-guard"
 
 interface ViaCepResponse {
   cep: string
@@ -205,7 +206,7 @@ function PerfilPageContent() {
   })
 
   const handlePlanosClick = () => {
-    router.push("/planos-publicos")
+    router.push("/planos")
   }
 
   // Verificar usuário e carregar perfil
@@ -1272,7 +1273,8 @@ function PerfilPageContent() {
                       <p className="text-orange-100 text-xs line-through">R$ 99,90</p>
                       <p className="text-white font-bold text-sm lg:text-base">
                         A partir de <span className="text-lg lg:text-2xl">R$ 49,90</span>
-                        <span className="text-xs lg:text-sm text-orange-100">/mês</span>
+                        <span className="text-xs lg:text-sm text-orange-100">/mês</span> ou <span className="text-lg lg:text-xl">R$ 20,00</span>
+                        <span className="text-xs lg:text-sm text-orange-100">/mês individual</span>
                       </p>
                     </div>
                     <Button 
@@ -1287,64 +1289,7 @@ function PerfilPageContent() {
               </Card>
             )}
 
-            {/* Plan Status Card - For all user types */}
-            {profileData.tipo_usuario === "comprador" && (
-              <Card className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 border-0 shadow-xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 via-blue-500/20 to-indigo-600/20"></div>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
 
-                <CardContent className="relative p-4 lg:p-6 text-white">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
-                        <User className="h-5 w-5 lg:h-6 lg:w-6 text-blue-300" />
-                      </div>
-                      <div>
-                        <h3 className="text-base lg:text-lg font-bold">Plano Atual</h3>
-                        <p className="text-blue-100 text-xs lg:text-sm">
-                          {getPlanDisplayName(profile?.plano_atual)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-blue-400 text-blue-900 px-2 py-1 rounded-full text-xs font-bold">
-                      ✅ ATIVO
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 mb-4 lg:mb-6">
-                    <div className="flex items-center gap-2 text-xs lg:text-sm">
-                      <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-blue-300 fill-current" />
-                      <span>Buscar veículos</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs lg:text-sm">
-                      <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-blue-300 fill-current" />
-                      <span>Favoritar anúncios</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs lg:text-sm">
-                      <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-blue-300 fill-current" />
-                      <span>Contatar vendedores</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
-                    <div className="text-center lg:text-left">
-                      <p className="text-blue-100 text-xs">Recursos inclusos</p>
-                      <p className="text-white font-bold text-sm lg:text-base">
-                        <span className="text-blue-300">✅ Acesso completo</span>
-                      </p>
-                    </div>
-                    <Link href="/veiculos">
-                      <Button className="bg-white text-blue-600 hover:bg-blue-50 font-bold px-4 lg:px-6 py-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 text-sm">
-                        <Car className="h-3 w-3 lg:h-4 lg:w-4 mr-2" />
-                        Ver Veículos
-                        <ArrowRight className="h-3 w-3 lg:h-4 lg:w-4 ml-2" />
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Active Subscription Card - Only for sellers and agencies with active subscription */}
             {(profileData.tipo_usuario === "vendedor" || profileData.tipo_usuario === "agencia") && 
@@ -1535,22 +1480,42 @@ function PerfilPageContent() {
             )}
 
             {profileData.tipo_usuario === "agencia" && (
-              <Card className="bg-green-50 border-green-200">
-                <CardContent className="p-4">
-                  <div className="text-center">
-                    <div className="bg-green-100 w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-3">
-                      <Building2 className="h-5 w-5 text-green-600" />
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <div className="bg-green-100 w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <Building2 className="h-5 w-5 text-green-600" />
+                      </div>
+                      <h3 className="font-medium text-gray-900 mb-2">Painel da Agência</h3>
+                      <p className="text-xs text-gray-600 mb-3">Gerencie sua agência</p>
+                      <AgencyPanelButton 
+                        userType={profileData.tipo_usuario} 
+                        variant="outline" 
+                        className="w-full"
+                      />
                     </div>
-                    <h3 className="font-medium text-gray-900 mb-2">Painel da Agência</h3>
-                    <p className="text-xs text-gray-600 mb-3">Gerencie sua agência</p>
-                    <AgencyPanelButton 
-                      userType={profileData.tipo_usuario} 
-                      variant="outline" 
-                      className="w-full"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-orange-50 border-orange-200">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <div className="bg-orange-100 w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <Car className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <h3 className="font-medium text-gray-900 mb-2">Cadastrar Veículos</h3>
+                      <p className="text-xs text-gray-600 mb-3">Adicione ao estoque</p>
+                      <Link href="/cadastro-veiculo">
+                        <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white w-full">
+                          <Plus className="h-3 w-3 mr-2" />
+                          Cadastrar
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             )}
 
             {/* Plan Details - For agency users */}
@@ -1653,11 +1618,11 @@ function PerfilPageContent() {
 
 export default function PerfilPage() {
   return (
-    <>
+    <RequireAuth>
       <Suspense fallback={null}>
         <ErrorHandler />
       </Suspense>
       <PerfilPageContent />
-    </>
+    </RequireAuth>
   )
 }
