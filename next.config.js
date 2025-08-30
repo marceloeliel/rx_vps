@@ -2,17 +2,10 @@
 const nextConfig = {
   output: 'standalone',
   experimental: {
-    outputFileTracingRoot: undefined
+    outputFileTracingRoot: undefined,
   },
   images: {
-    domains: ['localhost'],
     unoptimized: true
-  },
-  eslint: {
-    ignoreDuringBuilds: true
-  },
-  typescript: {
-    ignoreBuildErrors: true
   }
 }
 
