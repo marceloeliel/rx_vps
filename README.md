@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🚗 RX Veículos - Plataforma de Compra e Venda de Veículos
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.2.4-black)](https://nextjs.org/)
@@ -119,3 +120,6 @@ MIT License - veja [LICENSE](LICENSE) para detalhes.
 ---
 
 **Desenvolvido com ❤️ para o mercado automotivo brasileiro** 🇧🇷
+=======
+# rx_vps
+>>>>>>> ed4ec9ab99c8aafa28f606000eea17daa9434cbb
