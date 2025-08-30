@@ -13,6 +13,7 @@ import { Slider } from "@/components/ui/slider"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { VeiculoDetalhesModal } from "@/components/veiculo-detalhes-modal"
 import VeiculoCardPublic from "@/components/veiculo-card-public"
+import { formatFriendlyPrice } from "@/lib/utils/price-formatter"
 import {
   ArrowLeft,
   ChevronDown,
@@ -237,11 +238,7 @@ export default function VeiculosPage() {
   }
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 0,
-    }).format(price)
+    return formatFriendlyPrice(price)
   }
 
   const getVehicleIcon = (type: string) => {

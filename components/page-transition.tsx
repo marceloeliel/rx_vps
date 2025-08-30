@@ -56,7 +56,7 @@ function HydrationSafeWrapper({ children }: { children: React.ReactNode }) {
 
   // Durante a hidratação, renderizar de forma segura
   if (!isClient) {
-    return <div suppressHydrationWarning>{children}</div>
+    return <>{children}</>
   }
 
   return <>{children}</>
@@ -125,7 +125,7 @@ export function PageTransition({ children }: PageTransitionProps) {
 
   return (
     <HydrationSafeWrapper>
-      <div className="animate-in fade-in duration-200" suppressHydrationWarning>
+      <div className="animate-in fade-in duration-200">
         {children}
       </div>
     </HydrationSafeWrapper>

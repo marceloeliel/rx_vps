@@ -130,6 +130,7 @@ interface PlanControlResult {
 export function usePlanControl() {
   const [userPlan, setUserPlan] = useState<PlanConfiguration | null>(null)
   const [userUsage, setUserUsage] = useState<UserUsage | null>(null)
+  const [hasUnlimitedAccess, setHasUnlimitedAccess] = useState(false)
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
   const supabase = createClient()
@@ -150,12 +151,13 @@ export function usePlanControl() {
       // Buscar perfil do usuário
       const { data: profile } = await supabase
         .from('profiles')
-        .select('plano_atual')
+        .select('plano_atual, unlimited_access')
         .eq('id', user.id)
         .single()
 
       const planId = (profile?.plano_atual || 'basico') as PlanId
       setUserPlan(PLAN_CONFIGURATIONS[planId])
+      setHasUnlimitedAccess(profile?.unlimited_access || false)
 
       // Buscar contagem atual de veículos
       const { count: vehicleCount } = await supabase
@@ -196,6 +198,16 @@ export function usePlanControl() {
         canAdd: false,
         reason: 'Dados do plano não carregados',
         currentCount: 0,
+        maxAllowed: 0
+      }
+    }
+
+    // Se tem acesso ilimitado concedido pelo admin
+    if (hasUnlimitedAccess) {
+      return {
+        canAdd: true,
+        reason: 'Acesso ilimitado concedido pelo administrador',
+        currentCount: userUsage.currentVehicles,
         maxAllowed: 0
       }
     }
@@ -354,6 +366,7 @@ export function usePlanControl() {
   return {
     userPlan,
     userUsage,
+    hasUnlimitedAccess,
     loading,
     canAddVehicle,
     canFeatureVehicle,
@@ -367,32 +380,35 @@ export function usePlanControl() {
 
 // Hook para verificações específicas de recursos
 export function usePlanFeatures() {
-  const { userPlan, hasFeatureAccess } = usePlanControl()
+  const { userPlan, hasFeatureAccess, hasUnlimitedAccess } = usePlanControl()
 
   return {
     // Anúncios
-    canCreateBasicAds: hasFeatureAccess('hasBasicAds'),
-    canCreateFeaturedAds: hasFeatureAccess('hasFeaturedAds'),
-    canCreatePremiumAds: hasFeatureAccess('hasPremiumAds'),
+    canCreateBasicAds: hasUnlimitedAccess || hasFeatureAccess('hasBasicAds'),
+    canCreateFeaturedAds: hasUnlimitedAccess || hasFeatureAccess('hasFeaturedAds'),
+    canCreatePremiumAds: hasUnlimitedAccess || hasFeatureAccess('hasPremiumAds'),
     
     // Suporte
-    hasEmailSupport: hasFeatureAccess('hasEmailSupport'),
-    hasPhoneSupport: hasFeatureAccess('hasPhoneSupport'),
-    hasWhatsappSupport: hasFeatureAccess('hasWhatsappSupport'),
-    hasPrioritySupport: hasFeatureAccess('hasPrioritySupport'),
-    has24_7Support: hasFeatureAccess('has24_7Support'),
+    hasEmailSupport: hasUnlimitedAccess || hasFeatureAccess('hasEmailSupport'),
+    hasPhoneSupport: hasUnlimitedAccess || hasFeatureAccess('hasPhoneSupport'),
+    hasWhatsappSupport: hasUnlimitedAccess || hasFeatureAccess('hasWhatsappSupport'),
+    hasPrioritySupport: hasUnlimitedAccess || hasFeatureAccess('hasPrioritySupport'),
+    has24_7Support: hasUnlimitedAccess || hasFeatureAccess('has24_7Support'),
     
     // Estatísticas e Relatórios
-    hasBasicStats: hasFeatureAccess('hasBasicStats'),
-    hasAdvancedStats: hasFeatureAccess('hasAdvancedStats'),
-    hasCompleteStats: hasFeatureAccess('hasCompleteStats'),
-    hasCustomReports: hasFeatureAccess('hasCustomReports'),
-    hasAdvancedReports: hasFeatureAccess('hasAdvancedReports'),
+    hasBasicStats: hasUnlimitedAccess || hasFeatureAccess('hasBasicStats'),
+    hasAdvancedStats: hasUnlimitedAccess || hasFeatureAccess('hasAdvancedStats'),
+    hasCompleteStats: hasUnlimitedAccess || hasFeatureAccess('hasCompleteStats'),
+    hasCustomReports: hasUnlimitedAccess || hasFeatureAccess('hasCustomReports'),
+    hasAdvancedReports: hasUnlimitedAccess || hasFeatureAccess('hasAdvancedReports'),
     
     // Recursos avançados
-    hasAdminPanel: hasFeatureAccess('hasAdminPanel'),
-    hasApiAccess: hasFeatureAccess('hasApiAccess'),
-    hasDedicatedConsulting: hasFeatureAccess('hasDedicatedConsulting'),
+    hasAdminPanel: hasUnlimitedAccess || hasFeatureAccess('hasAdminPanel'),
+    hasApiAccess: hasUnlimitedAccess || hasFeatureAccess('hasApiAccess'),
+    hasDedicatedConsulting: hasUnlimitedAccess || hasFeatureAccess('hasDedicatedConsulting'),
+    
+    // Status de acesso ilimitado
+    hasUnlimitedAccess,
     
     // Informações do plano
     planName: userPlan?.name || 'Básico',

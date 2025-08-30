@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 interface SubscriptionStatus {
   isActive: boolean
+  hasAccess: boolean
   planType: string | null
   expiresAt: string | null
   status: string
@@ -29,6 +30,7 @@ export function useSubscription(): UseSubscriptionReturn {
   const [profile, setProfile] = useState<any>(null)
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>({
     isActive: false,
+    hasAccess: false,
     planType: null,
     expiresAt: null,
     status: 'inactive',
@@ -57,6 +59,7 @@ export function useSubscription(): UseSubscriptionReturn {
         setProfile(null)
         setSubscriptionStatus({
           isActive: false,
+          hasAccess: false,
           planType: null,
           expiresAt: null,
           status: 'not_authenticated',
@@ -81,12 +84,19 @@ export function useSubscription(): UseSubscriptionReturn {
         setProfile(profileData)
       }
 
-      // Sistema de pagamentos desabilitado - retornar status padrão
+      // Verificar se o usuário tem acesso baseado no perfil
+      const hasAccess = profileData?.unlimited_access === true || 
+                       profileData?.plano_atual === 'ilimitado' ||
+                       profileData?.plano_atual === 'premium_plus' ||
+                       profileData?.plano_atual === 'empresarial'
+
+      // Sistema de pagamentos desabilitado - retornar status baseado no perfil
       setSubscriptionStatus({
-        isActive: false,
-        planType: null,
+        isActive: hasAccess,
+        hasAccess: hasAccess,
+        planType: profileData?.plano_atual || null,
         expiresAt: null,
-        status: 'payment_system_disabled',
+        status: hasAccess ? 'active' : 'payment_system_disabled',
         daysRemaining: null
       })
 
@@ -105,12 +115,21 @@ export function useSubscription(): UseSubscriptionReturn {
   }
 
   const hasFeatureAccess = (feature: string): boolean => {
-    // Sistema de pagamentos desabilitado - retornar false para todas as features
-    return false
+    // Retornar true se o usuário tem acesso ilimitado
+    return subscriptionStatus.hasAccess
   }
 
   const getPlanLimits = () => {
-    // Sistema de pagamentos desabilitado - retornar limites padrão
+    // Retornar limites baseados no status do usuário
+    if (subscriptionStatus.hasAccess) {
+      return {
+        maxVehicles: 999999,
+        maxPhotos: 999999,
+        canCreateAgency: true
+      }
+    }
+    
+    // Limites padrão para usuários sem acesso
     return {
       maxVehicles: 0,
       maxPhotos: 0,

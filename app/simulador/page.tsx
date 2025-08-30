@@ -66,6 +66,7 @@ export default function SimuladorPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [loadingUserData, setLoadingUserData] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [salvandoSimulacao, setSalvandoSimulacao] = useState(false)
   const [simulacaoSalva, setSimulacaoSalva] = useState(false)
   const [formData, setFormData] = useState<StepData>({
@@ -122,6 +123,36 @@ export default function SimuladorPage() {
     tipoVeiculo: formData.tipoVeiculo,
     enableCache: true 
   })
+
+  // Verificar autenticação do usuário
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          toast({
+            title: "Acesso negado",
+            description: "Você precisa estar logado para usar o simulador de financiamento.",
+            variant: "destructive",
+          })
+          router.push('/')
+          return
+        }
+        setIsAuthenticated(true)
+        setCurrentUser(user)
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error)
+        toast({
+          title: "Erro de autenticação",
+          description: "Ocorreu um erro ao verificar sua autenticação. Tente novamente.",
+          variant: "destructive",
+        })
+        router.push('/')
+      }
+    }
+
+    checkAuth()
+  }, [router, supabase, toast])
 
   // Capturar parâmetros da URL para pré-preencher dados do veículo
   useEffect(() => {

@@ -35,7 +35,7 @@ async function validateUserStatus(supabase: any, userId: string) {
     // Verificar se o perfil ainda existe na tabela profiles
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, email, tipo_usuario, created_at')
+      .select('id, email, tipo_usuario, created_at, unlimited_access')
       .eq('id', userId)
       .single()
 

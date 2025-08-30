@@ -373,14 +373,7 @@ export function UserPlanDetails({ showUpgradeButton = true, compact = false }: U
                   )}
                   <span className="text-sm">Relatórios personalizados</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {planFeatures?.hasApiAccess ? (
-                    <CheckCircle className="w-3 h-3 text-green-500" />
-                  ) : (
-                    <XCircle className="w-3 h-3 text-red-500" />
-                  )}
-                  <span className="text-sm">Acesso à API</span>
-                </div>
+
               </div>
             </div>
           </div>

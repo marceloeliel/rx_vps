@@ -364,11 +364,7 @@ export function PlanUsageDashboard({ showUpgradePrompt = false }: PlanUsageDashb
                   {getStatusIcon(planFeatures.hasAdminPanel)}
                   <span>Painel administrativo</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(planFeatures.hasApiAccess)}
-                  <Code className="h-3 w-3" />
-                  <span>Acesso à API</span>
-                </div>
+
                 <div className="flex items-center gap-2">
                   {getStatusIcon(planFeatures.hasDedicatedConsulting)}
                   <Users className="h-3 w-3" />

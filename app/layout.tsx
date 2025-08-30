@@ -121,7 +121,7 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <HydrationSafe>
           <Providers>
-            <div className="flex flex-col min-h-screen" suppressHydrationWarning>
+            <div className="flex flex-col min-h-screen">
               <TrialNotificationBar />
               <main className="flex-grow">
                 <PageTransition>{children}</PageTransition>

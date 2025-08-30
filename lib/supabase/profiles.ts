@@ -25,6 +25,7 @@ export interface UserProfile {
   plano_data_fim?: string
   plano_data_inicio?: string
   plano_payment_id?: string
+  unlimited_access?: boolean
   // asaas_customer_id removido - sistema de pagamentos desabilitado
 }
 

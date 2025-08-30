@@ -8,6 +8,7 @@ export interface Veiculo {
   modelo_nome: string
   titulo: string
   descricao?: string
+  observacoes?: string
   ano_fabricacao: number
   ano_modelo: number
   quilometragem?: number
@@ -35,6 +36,9 @@ export interface Veiculo {
   tipo_veiculo?: string
   profile_id?: string
   user_id?: string
+  // Dados de localização do usuário/agência
+  user_cidade?: string
+  user_estado?: string
 }
 
 export interface VeiculoFormData {
@@ -345,8 +349,11 @@ export async function getVeiculosPublicos(filters?: {
   const end = start + limit - 1
 
   try {
-    // Criar a consulta base
-    let query = supabase.from("veiculos").select("*", { count: "exact" }).eq("status", "ativo")
+    // Buscar veículos sem JOIN primeiro
+    let query = supabase
+      .from("veiculos")
+      .select("*", { count: "exact" })
+      .eq("status", "ativo")
 
     // Aplicar filtros
     if (filters) {
@@ -389,9 +396,41 @@ export async function getVeiculosPublicos(filters?: {
     query = query.order("created_at", { ascending: false }).range(start, end)
 
     // Executar a consulta
-    const { data, error, count } = await query
+    const { data: veiculos, error, count } = await query
 
-    return { data, error, count: count || 0 }
+    if (error) {
+      console.error("Erro ao buscar veículos públicos:", error)
+      return { data: null, error, count: 0 }
+    }
+
+    if (!veiculos || veiculos.length === 0) {
+      return { data: [], error: null, count: count || 0 }
+    }
+
+    // Buscar dados de localização dos profiles associados
+    const profileIds = [...new Set(veiculos.map(v => v.profile_id).filter(Boolean))]
+    
+    let profilesData: any[] = []
+    if (profileIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, cidade, estado")
+        .in("id", profileIds)
+      
+      profilesData = profiles || []
+    }
+
+    // Processar os dados para incluir informações de localização
+    const processedData = veiculos.map((veiculo: any) => {
+      const profile = profilesData.find(p => p.id === veiculo.profile_id)
+      return {
+        ...veiculo,
+        user_cidade: profile?.cidade || null,
+        user_estado: profile?.estado || null
+      }
+    })
+
+    return { data: processedData, error: null, count: count || 0 }
   } catch (error) {
     console.error("Erro ao buscar veículos públicos:", error)
     return { data: null, error, count: 0 }

@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Heart, Calendar, Gauge, Phone, Mail, MapPin, Calculator } from "lucide-react"
 import { VeiculoDetalhesModal } from "@/components/veiculo-detalhes-modal"
 import { LoginRequiredDialog } from "@/components/login-required-dialog"
+import { formatFriendlyPrice } from "@/lib/utils/price-formatter"
 
 interface VeiculoCardPublicProps {
   veiculo: Veiculo
@@ -93,10 +94,7 @@ export default function VeiculoCardPublic({
   }
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value)
+    return formatFriendlyPrice(value)
   }
 
   const formatNumber = (value: number) => {
@@ -146,7 +144,14 @@ export default function VeiculoCardPublic({
         
         // Registrar como lead
         if (agencyId) {
-          await createLead(user.id, veiculo.id, agencyId, 'favorite')
+          try {
+            const result = await createLead(user.id, veiculo.id, agencyId, 'favorite')
+            if (result.error && result.error.message && !result.error.message.includes('unique') && !result.error.message.includes('duplicate')) {
+              console.error('❌ [LEADS] Erro ao criar lead de favorito:', result.error.message)
+            }
+          } catch (error) {
+            console.error('❌ [LEADS] Erro inesperado ao criar lead de favorito:', error)
+          }
         }
         
         setIsFavorited(true)
@@ -180,9 +185,12 @@ export default function VeiculoCardPublic({
     if (veiculo.id && agencyId) {
       try {
         const leadType = type === 'whatsapp' ? 'contact_whatsapp' : 'contact_email'
-        await createLead(user.id, veiculo.id, agencyId, leadType)
+        const result = await createLead(user.id, veiculo.id, agencyId, leadType)
+        if (result.error && result.error.message && !result.error.message.includes('unique') && !result.error.message.includes('duplicate')) {
+          console.error('❌ [LEADS] Erro ao criar lead de contato:', result.error.message)
+        }
       } catch (error) {
-        console.error('❌ [LEADS] Erro ao criar lead de contato:', error)
+        console.error('❌ [LEADS] Erro inesperado ao criar lead de contato:', error)
       }
     }
 
@@ -295,6 +303,17 @@ export default function VeiculoCardPublic({
                 )}
               </div>
               
+              {/* Localização */}
+              <div className="flex items-center gap-1 text-sm text-gray-600">
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">
+                  {veiculo.user_cidade && veiculo.user_estado 
+                    ? `${veiculo.user_cidade}, ${veiculo.user_estado}`
+                    : "Localização não informada"
+                  }
+                </span>
+              </div>
+              
               {/* Texto negociável abaixo da data */}
               {veiculo.tipo_preco === 'Negociável' && (
                 <div className="text-sm text-gray-600">
@@ -339,10 +358,14 @@ export default function VeiculoCardPublic({
                   // Registrar lead de simulação se usuário estiver logado
                   if (user && veiculo.id && agencyId) {
                     try {
-                      await createLead(user.id, veiculo.id, agencyId, 'simulation')
-                      console.log('✅ [LEADS] Lead de simulação registrado com sucesso')
+                      const result = await createLead(user.id, veiculo.id, agencyId, 'simulation')
+                      if (result.error && result.error.message && !result.error.message.includes('unique') && !result.error.message.includes('duplicate')) {
+                        console.error('❌ [LEADS] Erro ao criar lead de simulação:', result.error.message)
+                      } else if (!result.error) {
+                        console.log('✅ [LEADS] Lead de simulação registrado com sucesso')
+                      }
                     } catch (error) {
-                      console.error('❌ [LEADS] Erro ao registrar lead de simulação:', error)
+                      console.error('❌ [LEADS] Erro inesperado ao registrar lead de simulação:', error)
                     }
                   }
                   

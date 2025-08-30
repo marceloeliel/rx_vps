@@ -1,6 +1,6 @@
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface AgencyPanelButtonProps {
   userType?: string
@@ -34,4 +34,4 @@ export function AgencyPanelButton({ userType, className, variant = "default" }: 
       Painel da Agência
     </Button>
   )
-} 
+}

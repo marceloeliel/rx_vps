@@ -50,7 +50,13 @@ export default function VerificacaoVendedor({ children }: VerificacaoVendedorPro
 
         // Determinar se pode vender
         const canUserSell =
-          userProfile?.tipo_usuario === "vendedor" || userProfile?.tipo_usuario === "agencia" || hasAgency
+          userProfile?.unlimited_access === true ||
+          userProfile?.plano_atual === 'ilimitado' ||
+          userProfile?.plano_atual === 'premium_plus' ||
+          userProfile?.plano_atual === 'empresarial' ||
+          userProfile?.tipo_usuario === "vendedor" || 
+          userProfile?.tipo_usuario === "agencia" || 
+          hasAgency
 
         setCanSell(canUserSell)
       } catch (error) {

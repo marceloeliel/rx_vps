@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
 import { getAgencyLeads, getAgencyLeadsStats, type LeadWithUserData } from "@/lib/supabase/vehicle-favorites"
+import { formatFriendlyPrice } from "@/lib/utils/price-formatter"
 import { Heart, MessageCircle, Phone, Mail, Calendar, MapPin, Car, DollarSign } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -58,10 +59,7 @@ const interestTypeConfig = {
 }
 
 function formatPrice(price: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(price)
+  return formatFriendlyPrice(price)
 }
 
 export function AgencyLeads({ agencyId }: AgencyLeadsProps) {

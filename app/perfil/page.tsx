@@ -1225,9 +1225,9 @@ function PerfilPageContent() {
               </Card>
             </div>
 
-            {/* Premium Upgrade Card - Only for sellers and agencies without active subscription */}
+            {/* Premium Upgrade Card - Only for sellers and agencies without active subscription or unlimited access */}
             {(profileData.tipo_usuario === "vendedor" || profileData.tipo_usuario === "agencia") && 
-             !subscriptionStatus.hasAccess && (
+             !subscriptionStatus.hasAccess && !profileData.unlimited_access && (
               <Card className="relative overflow-hidden bg-gradient-to-br from-orange-500 via-orange-600 to-red-600 border-0 shadow-xl">
                 <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-orange-500/20 to-red-600/20"></div>
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>

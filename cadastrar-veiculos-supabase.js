@@ -564,3 +564,7 @@ async function cadastrarVeiculos() {
 // Executar o script
 cadastrarVeiculos().catch(console.error);
 
+
+
+
+

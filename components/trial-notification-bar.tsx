@@ -134,6 +134,7 @@ export function TrialNotificationBar() {
   const [mounted, setMounted] = useState(false)
   const [trialData, setTrialData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [autoHideTimer, setAutoHideTimer] = useState<NodeJS.Timeout | null>(null)
   
   const supabase = createClient()
   
@@ -202,7 +203,38 @@ export function TrialNotificationBar() {
     loadTrialData()
   }, [])
 
+  // Auto-hide após 30 segundos para notificações não críticas
+  useEffect(() => {
+    if (mounted && trialData && !loading && isVisible && !isDismissed) {
+      const { daysRemaining } = trialData
+      const isExpired = daysRemaining <= 0
+      const isBlocked = isExpired
+      
+      // Só aplica auto-hide se não for crítico (não expirado e não bloqueado)
+      if (!isExpired && !isBlocked) {
+        const timer = setTimeout(() => {
+          setIsVisible(false)
+        }, 30000) // 30 segundos
+        
+        setAutoHideTimer(timer)
+        
+        // Cleanup do timer
+        return () => {
+          if (timer) {
+            clearTimeout(timer)
+          }
+        }
+      }
+    }
+  }, [mounted, trialData, loading, isVisible, isDismissed])
+
   const handleClose = () => {
+    // Limpar timer se existir
+    if (autoHideTimer) {
+      clearTimeout(autoHideTimer)
+      setAutoHideTimer(null)
+    }
+    
     setIsVisible(false)
     setIsDismissed(true)
     if (typeof window !== 'undefined') {

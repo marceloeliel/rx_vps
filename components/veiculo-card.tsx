@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { deleteVeiculo, type Veiculo } from "@/lib/supabase/veiculos"
-import { Edit, MoreVertical, Trash2, Eye, Users, Calendar, Gauge } from "lucide-react"
+import { Edit, MoreVertical, Trash2, Eye, Users, Calendar, Gauge, MapPin } from "lucide-react"
+import { formatFriendlyPrice } from "@/lib/utils/price-formatter"
 
 interface VeiculoCardProps {
   veiculo: Veiculo
@@ -33,10 +34,7 @@ export default function VeiculoCard({ veiculo, onDelete, showActions = true }: V
   const [deleting, setDeleting] = useState(false)
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value)
+    return formatFriendlyPrice(value)
   }
 
   const formatNumber = (value: number) => {
@@ -154,19 +152,32 @@ export default function VeiculoCard({ veiculo, onDelete, showActions = true }: V
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                <span>
-                  {veiculo.ano_fabricacao}/{veiculo.ano_modelo}
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  <span>
+                    {veiculo.ano_fabricacao}/{veiculo.ano_modelo}
+                  </span>
+                </div>
+                {veiculo.quilometragem && (
+                  <div className="flex items-center gap-1">
+                    <Gauge className="h-3 w-3" />
+                    <span>{formatNumber(veiculo.quilometragem)} km</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Localização */}
+              <div className="flex items-center gap-1 text-sm text-gray-600">
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">
+                  {veiculo.user_cidade && veiculo.user_estado 
+                    ? `${veiculo.user_cidade}, ${veiculo.user_estado}`
+                    : "Localização não informada"
+                  }
                 </span>
               </div>
-              {veiculo.quilometragem && (
-                <div className="flex items-center gap-1">
-                  <Gauge className="h-3 w-3" />
-                  <span>{formatNumber(veiculo.quilometragem)} km</span>
-                </div>
-              )}
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-gray-100">

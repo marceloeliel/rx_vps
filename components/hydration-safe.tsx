@@ -32,20 +32,28 @@ export function HydrationSafe({ children, fallback }: HydrationSafeProps) {
         'data-bitwarden-watching',
         'data-1p-ignore',
         'data-gramm',
-        'grammarly-extension'
+        'grammarly-extension',
+        'data-darkreader',
+        'data-adguard'
       ]
       
       // Verificar se é erro de hidratação com atributos de extensão
       const isHydrationError = fullMessage.includes('hydration') || 
                               fullMessage.includes('server rendered html') ||
-                              fullMessage.includes('didn\'t match the client')
+                              fullMessage.includes('didn\'t match the client') ||
+                              fullMessage.includes('a tree hydrated but some attributes')
       
       const hasExtensionAttribute = hydrationExtensionPatterns.some(pattern => 
         fullMessage.includes(pattern.toLowerCase())
       )
       
-      // Suprimir apenas se for erro de hidratação E contiver atributos de extensão
-      return isHydrationError && hasExtensionAttribute
+      // Também suprimir erros específicos do React sobre hidratação
+      const isReactHydrationWarning = fullMessage.includes('suppresshydrationwarning') ||
+                                     fullMessage.includes('hydration mismatch') ||
+                                     (fullMessage.includes('warning') && fullMessage.includes('hydration'))
+      
+      // Suprimir se for erro de hidratação com extensões OU aviso específico do React
+      return (isHydrationError && hasExtensionAttribute) || isReactHydrationWarning
     }
 
     console.error = (...args) => {
@@ -71,9 +79,9 @@ export function HydrationSafe({ children, fallback }: HydrationSafeProps) {
   // Durante a hidratação inicial, usar fallback ou renderização segura
   if (!isClient) {
     return (
-      <div suppressHydrationWarning>
+      <>
         {fallback || children}
-      </div>
+      </>
     )
   }
 

@@ -23,9 +23,10 @@ export function AuthGuard({
   showLoader = true,
   fallback 
 }: AuthGuardProps) {
-  const authGuard = requireAuth 
-    ? useRequireAuth(redirectTo)
-    : useAuthGuard({ redirectTo, enableAutoCheck: false, showToastOnLogout: false })
+  const requireAuthHook = useRequireAuth(redirectTo)
+  const authGuardHook = useAuthGuard({ redirectTo, enableAutoCheck: false, showToastOnLogout: false })
+  
+  const authGuard = requireAuth ? requireAuthHook : authGuardHook
 
   // Se está carregando, mostrar loader
   if (authGuard.isLoading) {

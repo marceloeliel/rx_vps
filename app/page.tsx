@@ -32,11 +32,12 @@ import { getImagensCarrossel, type ImagemCarrossel } from "@/lib/supabase/carros
 import { getVeiculosPublicos, type Veiculo } from "@/lib/supabase/veiculos"
 import { VeiculoDetalhesModal } from "@/components/veiculo-detalhes-modal"
 import { LocationBadge } from "@/components/location-badge"
-import PaidAdsSection from "@/components/PaidAdsSection"
+import FeaturedAgenciesSection from "@/components/FeaturedAgenciesSection"
 import { useSubscription } from "@/hooks/use-subscription"
 import { TrialCounter } from "@/components/trial-counter"
 import { AuthGuard } from "@/components/auth-guard"
 import { useTrial } from "@/hooks/use-trial"
+import { formatFriendlyPrice } from "@/lib/utils/price-formatter"
 
 // Componente do carrossel móvel de categorias
 function MobileCategoriesCarousel() {
@@ -160,7 +161,7 @@ function MobileCarsCarousel() {
 
 // import { TrialDebug } from "@/components/trial-debug"
 
-export default function HomePage() {
+function HomePage() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -346,6 +347,8 @@ export default function HomePage() {
 
         // Filtrar apenas veículos em destaque
         const veiculosComDestaque = veiculos?.filter((veiculo) => veiculo.destaque === true) || []
+
+        // Dados de localização processados pela função getVeiculosPublicos
 
         console.log(`✅ ${veiculosComDestaque.length} veículos em destaque encontrados`)
         setVeiculosDestaque(veiculosComDestaque.slice(0, 6)) // Máximo 6 veículos
@@ -802,7 +805,7 @@ export default function HomePage() {
                       alt={`${veiculo.marca_nome} ${veiculo.modelo_nome} ${veiculo.ano_fabricacao}`}
                       width={300}
                       height={200}
-                      className="w-full h-40 sm:h-48 sm:object-cover object-contain bg-gray-50"
+                      className="w-full h-48 sm:h-56 md:h-52 lg:h-48 object-cover bg-gray-50"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
                         target.src = "/placeholder.svg?height=200&width=300&text=Erro+ao+carregar"
@@ -858,10 +861,7 @@ export default function HomePage() {
                     </p>
 
                     <div className="text-base font-bold text-gray-900 mb-2">
-                      {new Intl.NumberFormat("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      }).format(veiculo.preco || 0)}
+                      {formatFriendlyPrice(veiculo.preco || 0)}
                     </div>
 
                     <div className="space-y-1 mb-2">
@@ -882,7 +882,12 @@ export default function HomePage() {
 
                       <div className="flex items-center gap-1 text-xs text-gray-600">
                         <MapPin className="h-2.5 w-2.5 flex-shrink-0" />
-                        <span className="truncate">São Paulo, SP</span>
+                        <span className="truncate">
+                          {veiculo.user_cidade && veiculo.user_estado 
+                            ? `${veiculo.user_cidade}, ${veiculo.user_estado}`
+                            : "Localização não informada"
+                          }
+                        </span>
                         <Badge
                           variant="outline"
                           className="ml-1 text-green-600 border-green-600 text-xs px-1 py-0 flex-shrink-0"
@@ -913,7 +918,7 @@ export default function HomePage() {
 
                     <Button
                       onClick={() => handleVerDetalhes(veiculo)}
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-xs py-1.5 h-auto"
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-sm py-3 h-auto font-medium transition-all duration-200 hover:shadow-md"
                     >
                       Ver detalhes
                     </Button>
@@ -1039,7 +1044,7 @@ export default function HomePage() {
       </section>
 
       {/* Agências em Destaque - Componente Dinâmico */}
-      <PaidAdsSection maxAds={6} showTitle={true} />
+      <FeaturedAgenciesSection maxAgencies={6} showTitle={true} />
 
       {/* Categorias */}
       <section className="py-12">
@@ -1334,3 +1339,5 @@ export default function HomePage() {
     </AuthGuard>
   )
 }
+
+export default HomePage

@@ -5,8 +5,6 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   X,
   Heart,
@@ -36,6 +34,8 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react"
+import { LoginModal } from "@/components/login-modal"
+
 import type { Veiculo } from "@/lib/supabase/veiculos"
 import { createClient } from "@/lib/supabase/client"
 import { createLead } from "@/lib/supabase/vehicle-favorites"
@@ -66,7 +66,6 @@ interface DadosAgencia {
   created_at: string
 }
 
-// Funções de formatação
 const formatCnpj = (cnpj?: string) => {
   if (!cnpj) return "Não informado"
   const numbers = cnpj.replace(/\D/g, "")
@@ -89,27 +88,45 @@ const formatPhone = (phone?: string) => {
   return phone
 }
 
+const maskPhone = (phone?: string) => {
+  if (!phone) return "Não informado"
+  const numbers = phone.replace(/\D/g, "")
+
+  if (numbers.length === 11) {
+    return numbers.replace(/(\d{2})(\d{1})(\d{4})(\d{4})/, "($1) $2 ****-****")
+  }
+  if (numbers.length === 10) {
+    return numbers.replace(/(\d{2})(\d{4})(\d{4})/, "($1) ****-****")
+  }
+  return "****-****"
+}
+
+const maskCnpj = (cnpj?: string) => {
+  if (!cnpj) return "Não informado"
+  return "**.***.***/****-**"
+}
+
+const maskEmail = (email?: string) => {
+  if (!email) return "Não informado"
+  const [username, domain] = email.split('@')
+  if (username && domain) {
+    const maskedUsername = username.length > 2 ? username.slice(0, 2) + '*'.repeat(username.length - 2) : '**'
+    return `${maskedUsername}@${domain}`
+  }
+  return "***@***.com"
+}
+
 export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalhesModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [dadosAgencia, setDadosAgencia] = useState<DadosAgencia | null>(null)
   const [loadingAgencia, setLoadingAgencia] = useState(true)
   const [isFavorito, setIsFavorito] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const supabase = createClient()
   const [imagens, setImagens] = useState<string[]>([])
   const [loadingImagens, setLoadingImagens] = useState(true)
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
-  // Remover esta linha:
-  // const imagens = [veiculo.foto_principal || "/placeholder.svg?height=400&width=600&text=Sem+Foto", ...]
-
-  // Simular múltiplas imagens (na prática, viriam do banco)
-  // const imagens = [
-  //   veiculo.foto_principal || "/placeholder.svg?height=400&width=600&text=Sem+Foto",
-  //   "/placeholder.svg?height=400&width=600&text=Foto+2",
-  //   "/placeholder.svg?height=400&width=600&text=Foto+3",
-  //   "/placeholder.svg?height=400&width=600&text=Foto+4",
-  // ].filter(Boolean)
-
-  // Função para verificar se o veículo é novo (menos de 7 dias)
   const isVeiculoNovo = (dataCadastro?: string) => {
     if (!dataCadastro) return false
     const dataAtual = new Date()
@@ -118,7 +135,6 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
     return diferencaEmDias < 7
   }
 
-  // Carregar dados da agência
   useEffect(() => {
     const loadDadosAgencia = async () => {
       if (!veiculo.user_id) {
@@ -127,12 +143,10 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
       }
 
       try {
-        // Buscar dados da agência pelo user_id do veículo
         const { data, error } = await supabase.from("dados_agencia").select("*").eq("user_id", veiculo.user_id).single()
 
         if (error) {
           console.error("Erro ao carregar dados da agência:", error)
-          // Se não encontrar na tabela dados_agencia, buscar dados básicos do perfil
           const { data: profileData, error: profileError } = await supabase
             .from("profiles")
             .select("*")
@@ -140,7 +154,6 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
             .single()
 
           if (!profileError && profileData) {
-            // Criar objeto compatível com DadosAgencia usando dados do perfil
             setDadosAgencia({
               id: profileData.id,
               user_id: profileData.id,
@@ -162,11 +175,8 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
       }
     }
 
-    // Modificar a função loadImagensVeiculo para usar o campo 'fotos' existente como fallback
-
     const loadImagensVeiculo = async () => {
       try {
-        // Primeiro, tentar buscar da nova tabela veiculo_fotos
         const { data: fotosData, error: fotosError } = await supabase
           .from("veiculo_fotos")
           .select("url_foto")
@@ -175,16 +185,13 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
 
         const todasFotos: string[] = []
 
-        // Se a tabela veiculo_fotos não existir ou não tiver dados, usar o campo 'fotos' existente
         if (fotosError || !fotosData || fotosData.length === 0) {
           console.log("Usando fotos do campo 'fotos' da tabela veiculos")
 
-          // Adicionar foto principal primeiro se existir
           if (veiculo.foto_principal) {
             todasFotos.push(veiculo.foto_principal)
           }
 
-          // Adicionar fotos do array 'fotos' se existir
           if (veiculo.fotos && Array.isArray(veiculo.fotos)) {
             veiculo.fotos.forEach((foto) => {
               if (foto && foto !== veiculo.foto_principal) {
@@ -193,10 +200,8 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
             })
           }
         } else {
-          // Usar dados da tabela veiculo_fotos
           console.log("Usando fotos da tabela veiculo_fotos")
 
-          // Adicionar foto principal primeiro se existir e não estiver nas fotos
           if (veiculo.foto_principal) {
             const fotoJaExiste = fotosData.some((foto: any) => foto.url_foto === veiculo.foto_principal)
             if (!fotoJaExiste) {
@@ -204,7 +209,6 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
             }
           }
 
-          // Adicionar fotos da tabela
           fotosData.forEach((foto: any) => {
             if (foto.url_foto) {
               todasFotos.push(foto.url_foto)
@@ -212,18 +216,14 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
           })
         }
 
-        // Se não houver fotos, usar placeholder
         if (todasFotos.length === 0) {
           todasFotos.push("/placeholder.svg?height=400&width=600&text=Sem+Foto")
         }
 
-        // Remover duplicatas mantendo a ordem
         const fotosUnicas = todasFotos.filter((foto, index) => todasFotos.indexOf(foto) === index)
-
         setImagens(fotosUnicas)
       } catch (error) {
         console.error("Erro inesperado ao carregar fotos:", error)
-        // Fallback final: usar apenas foto principal ou placeholder
         const fallbackFotos = []
         if (veiculo.foto_principal) {
           fallbackFotos.push(veiculo.foto_principal)
@@ -242,7 +242,23 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
     }
   }, [veiculo.user_id, isOpen, supabase, veiculo.id, veiculo.foto_principal, veiculo.fotos])
 
-  // Registrar visualização quando o modal é aberto
+  // Verificar autenticação do usuário
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setIsAuthenticated(!!user)
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error)
+        setIsAuthenticated(false)
+      }
+    }
+
+    if (isOpen) {
+      checkAuth()
+    }
+  }, [isOpen, supabase])
+
   useEffect(() => {
     const registerView = async () => {
       if (!isOpen || !veiculo.id || !veiculo.user_id) return
@@ -256,36 +272,42 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
         }
         
         if (user?.id) {
-          // Buscar o profile_id correto baseado no user_id do veículo
-          const { data: profile } = await supabase
+          // Buscar o profile da agência para obter o agency_id correto
+          const { data: agencyProfile } = await supabase
             .from('profiles')
-            .select('id')
+            .select('id, agency_id')
             .eq('id', veiculo.user_id)
             .single()
           
-          if (profile) {
-            const result = await createLead(user.id, veiculo.id, profile.id, 'view_details')
+          if (agencyProfile) {
+            // Usar agency_id se disponível, senão usar o profile.id como fallback
+            const agencyId = agencyProfile.agency_id || agencyProfile.id
+            const result = await createLead(user.id, veiculo.id, agencyId, 'view_details')
             if (result.error) {
-              console.error('❌ [LEADS] Erro ao criar lead:', result.error)
+              // Só logar erros que não sejam vazios ou de constraint
+              if (result.error.message && !result.error.message.includes('unique') && !result.error.message.includes('duplicate')) {
+                console.error('❌ [LEADS] Erro ao criar lead de visualização:', {
+                  message: result.error.message,
+                  code: result.error.code,
+                  vehicleId: veiculo.id,
+                  userId: user.id,
+                  agencyId: agencyId
+                })
+              } else {
+                console.log('ℹ️ [LEADS] Lead de visualização já existe ou foi processado')
+              }
             } else {
-              console.log('✅ [LEADS] Lead de visualização criado com sucesso')
+              console.log('✅ [LEADS] Lead de visualização criado/atualizado com sucesso')
             }
           } else {
             console.log('ℹ️ [LEADS] Profile da agência não encontrado, pulando criação de lead')
           }
         }
       } catch (error) {
-        console.error('❌ [LEADS] Erro inesperado ao registrar visualização:', {
-          message: error instanceof Error ? error.message : 'Erro desconhecido',
-          userId: undefined, // Removed reference to undefined user variable
-          vehicleId: veiculo.id,
-          agencyUserId: veiculo.user_id,
-          error
-        })
+        console.error('❌ [LEADS] Erro inesperado ao registrar visualização:', error)
       }
     }
 
-    // Só executar quando o modal estiver aberto E veiculo.user_id estiver disponível
     if (isOpen && veiculo.user_id) {
       registerView()
     }
@@ -295,7 +317,6 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-      minimumFractionDigits: 0,
     }).format(price)
   }
 
@@ -326,7 +347,6 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
         console.log("Erro ao compartilhar:", error)
       }
     } else {
-      // Fallback para navegadores que não suportam Web Share API
       navigator.clipboard.writeText(shareUrl)
       alert("Link copiado para a área de transferência!")
     }
@@ -334,6 +354,12 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
 
   const handleContact = (type: "phone" | "whatsapp" | "email") => {
     if (!dadosAgencia) return
+
+    // Verificar se o usuário está autenticado para WhatsApp
+    if (type === "whatsapp" && !isAuthenticated) {
+      setShowLoginModal(true)
+      return
+    }
 
     const telefone = dadosAgencia.whatsapp || dadosAgencia.telefone_principal
 
@@ -352,7 +378,7 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
           const subject = `Interesse em ${veiculo.marca_nome} ${veiculo.modelo_nome}`
           const body = `Olá! Tenho interesse no veículo ${veiculo.marca_nome} ${veiculo.modelo_nome} ${veiculo.ano_fabricacao} anunciado por ${formatPrice(veiculo.preco || 0)}. Gostaria de mais informações.`
           window.open(
-            `mailto:${dadosAgencia.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
+            `mailto:${dadosAgencia.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
           )
         }
         break
@@ -360,18 +386,27 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
   }
 
   const handleSimulateFinancing = async () => {
+    // Verificar se o usuário está autenticado
+    if (!isAuthenticated) {
+      setShowLoginModal(true)
+      return
+    }
+
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       
       if (!authError && user?.id && veiculo.id && veiculo.user_id) {
-        await createLead(user.id, veiculo.id, veiculo.user_id, 'simulation')
-        console.log('✅ [LEADS] Lead de simulação registrado com sucesso')
+        const result = await createLead(user.id, veiculo.id, veiculo.user_id, 'simulation')
+        if (result.error && result.error.message && !result.error.message.includes('unique') && !result.error.message.includes('duplicate')) {
+          console.error('❌ [LEADS] Erro ao criar lead de simulação:', result.error.message)
+        } else if (!result.error) {
+          console.log('✅ [LEADS] Lead de simulação registrado com sucesso')
+        }
       }
     } catch (error) {
       console.log('ℹ️ [LEADS] Lead de simulação não criado (usuário não autenticado)')
     }
 
-    // Construir URL com parâmetros completos do veículo
     const params = new URLSearchParams({
       veiculo: veiculo.id?.toString() || '',
       marca: veiculo.marca_nome || '',
@@ -386,465 +421,453 @@ export function VeiculoDetalhesModal({ veiculo, isOpen, onClose }: VeiculoDetalh
       titulo: `${veiculo.marca_nome || ''} ${veiculo.modelo_nome || ''} ${veiculo.ano_fabricacao?.toString() || ''}`
     } as Record<string, string>)
     
-    // Abrir simulador em nova aba
     window.open(`/simulador?${params.toString()}`, '_blank')
   }
 
+  if (!isOpen) return null
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] lg:max-w-6xl max-h-[95vh] sm:max-h-screen p-0 overflow-y-auto">
-        <div className="flex flex-col">
-          {/* Header */}
-          <DialogHeader className="p-2 md:p-3 pb-2 border-b sticky top-0 bg-white z-10">
-            <div className="flex items-center justify-between gap-2">
-              <DialogTitle className="text-sm md:text-lg font-bold leading-tight flex-1 min-w-0">
-                <span className="block truncate">
-                  {veiculo.marca_nome} {veiculo.modelo_nome} {veiculo.ano_fabricacao}
-                </span>
-              </DialogTitle>
-              <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsFavorito(!isFavorito)}
-                  className="text-gray-500 hover:text-red-500 h-8 w-8 p-0"
-                >
-                  <Heart className={`h-4 w-4 ${isFavorito ? "fill-red-500 text-red-500" : ""}`} />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleShare} className="text-gray-500 h-8 w-8 p-0">
-                  <Share2 className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </DialogHeader>
-
-          {/* Conteúdo principal sem ScrollArea */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-2 sm:gap-4 p-2 sm:p-4">
-            {/* Coluna Principal - Imagens e Detalhes */}
-            <div className="lg:col-span-3 space-y-2 sm:space-y-4">
-              {/* Galeria de Imagens */}
-              <div className="relative">
-                {loadingImagens ? (
-                  <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-                  </div>
-                ) : (
-                  <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
-                    <Image
-                      src={imagens[currentImageIndex] || "/placeholder.svg"}
-                      alt={`${veiculo.marca_nome} ${veiculo.modelo_nome} - Foto ${currentImageIndex + 1}`}
-                      fill
-                      className="object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = "/placeholder.svg?height=400&width=600&text=Erro+ao+carregar"
-                      }}
-                    />
-                    
-                    {/* Marca d'água */}
-                    <div className="absolute bottom-4 left-4 opacity-25 pointer-events-none">
-                      <Image
-                        src="https://ecdmpndeunbzhaihabvi.supabase.co/storage/v1/object/public/telas//3d%20sem%20fundo.png"
-                        alt="Marca d'água"
-                        width={60}
-                        height={60}
-                        className="object-contain"
-                      />
-                    </div>
-
-                    {/* Badges sobre a imagem */}
-                    <div className="absolute top-2 left-2 flex flex-col gap-1">
-                      <Badge className="bg-orange-500 text-white text-xs px-2 py-1">DESTAQUE</Badge>
-                      {isVeiculoNovo(veiculo.created_at) && (
-                        <Badge className="bg-green-500 text-white text-xs px-2 py-1">NOVO</Badge>
-                      )}
-                      {veiculo.estado_veiculo === "Seminovo" && (
-                        <Badge className="bg-blue-500 text-white">SEMINOVO</Badge>
-                      )}
-                    </div>
-
-                    {/* Navegação das imagens */}
-                    {imagens.length > 1 && (
-                      <>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white border-0"
-                          onClick={prevImage}
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white border-0"
-                          onClick={nextImage}
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-
-                        {/* Indicadores */}
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                          {imagens.map((_, index) => (
-                            <button
-                              key={index}
-                              onClick={() => setCurrentImageIndex(index)}
-                              className={`w-2 h-2 rounded-full transition-all ${
-                                index === currentImageIndex ? "bg-white" : "bg-white/50"
-                              }`}
-                              aria-label={`Ir para foto ${index + 1}`}
-                            />
-                          ))}
-                        </div>
-                      </>
-                    )}
-
-                    {/* Contador de fotos */}
-                    <div className="absolute top-4 right-4 bg-black/50 text-white px-2 py-1 rounded text-sm">
-                      {currentImageIndex + 1} / {imagens.length}
-                      {imagens.length > 1 && <span className="ml-1 text-xs opacity-75">fotos</span>}
-                    </div>
-
-                    {/* Badge de vídeo se houver */}
-                    {veiculo.video && (
-                      <div className="absolute bottom-4 right-4">
-                        <Badge className="bg-black/70 text-white flex items-center gap-1">
-                          <Play className="h-3 w-3" />
-                          Vídeo
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Thumbnails */}
-                {imagens.length > 1 && (
-                  <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                    {imagens.map((img, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={`relative flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition-all ${
-                          index === currentImageIndex ? "border-orange-500" : "border-gray-200"
-                        }`}
-                        aria-label={`Ver foto ${index + 1}`}
-                      >
-                        <Image
-                          src={img || "/placeholder.svg"}
-                          alt={`Thumbnail ${index + 1}`}
-                          fill
-                          className="object-cover"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Informações Principais */}
-              <Card>
-                <CardContent className="p-3 sm:p-4">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 gap-2">
-                    <div className="flex-1">
-                      <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 leading-tight">
-                        {veiculo.titulo || `${veiculo.marca_nome} ${veiculo.modelo_nome}`}
-                      </h2>
-                      <p className="text-gray-600 text-sm sm:text-base">
-                        {veiculo.marca_nome} • {veiculo.modelo_nome}
-                      </p>
-                    </div>
-                    <div className="text-left sm:text-right flex-shrink-0">
-                      <div className="text-xl sm:text-2xl font-bold text-orange-600 mb-1">{formatPrice(veiculo.preco || 0)}</div>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Eye className="h-4 w-4" />
-                        <span>1.2k visualizações</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Características Principais */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium">{veiculo.ano_fabricacao}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Gauge className="h-4 w-4 text-gray-400" />
-                      <span>{veiculo.quilometragem?.toLocaleString() || "0"} km</span>
-                    </div>
-                    {veiculo.combustivel && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Fuel className="h-4 w-4 text-gray-400" />
-                        <span>{veiculo.combustivel}</span>
-                      </div>
-                    )}
-                    {veiculo.cambio && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Settings className="h-4 w-4 text-gray-400" />
-                        <span>{veiculo.cambio}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Opções de Negociação */}
-                  <div className="flex gap-1 mb-4 flex-wrap">
-                    {veiculo.aceita_financiamento && (
-                      <Badge variant="outline" className="text-green-600 border-green-600 text-xs px-2 py-1">
-                        <CreditCard className="h-3 w-3 mr-1" />
-                        Aceita Financiamento
-                      </Badge>
-                    )}
-                    {veiculo.aceita_troca && (
-                      <Badge variant="outline" className="text-blue-600 border-blue-600 text-xs px-2 py-1">
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Aceita Troca
-                      </Badge>
-                    )}
-                    {veiculo.aceita_parcelamento && (
-                      <Badge variant="outline" className="text-purple-600 border-purple-600 text-xs px-2 py-1">
-                        <Banknote className="h-3 w-3 mr-1" />
-                        Aceita Parcelamento
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Descrição */}
-                  {veiculo.descricao && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Descrição</h3>
-                      <p className="text-gray-700 leading-relaxed">{veiculo.descricao}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Especificações Técnicas */}
-              <Card>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-base mb-3">Especificações Técnicas</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Marca:</span>
-                        <span className="font-medium">{veiculo.marca_nome}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Modelo:</span>
-                        <span className="font-medium">{veiculo.modelo_nome}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Ano:</span>
-                        <span className="font-medium">{veiculo.ano_fabricacao}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Quilometragem:</span>
-                        <span className="font-medium">{veiculo.quilometragem?.toLocaleString() || "0"} km</span>
-                      </div>
-                      {veiculo.cor && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Cor:</span>
-                          <span className="font-medium flex items-center gap-2">
-                            <Palette className="h-4 w-4" />
-                            {veiculo.cor}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      {veiculo.combustivel && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Combustível:</span>
-                          <span className="font-medium">{veiculo.combustivel}</span>
-                        </div>
-                      )}
-                      {veiculo.cambio && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Câmbio:</span>
-                          <span className="font-medium">{veiculo.cambio}</span>
-                        </div>
-                      )}
-                      {veiculo.estado_veiculo && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Estado:</span>
-                          <span className="font-medium">{veiculo.estado_veiculo}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Tipo:</span>
-                        <span className="font-medium flex items-center gap-2">
-                          <Car className="h-4 w-4" />
-                          {veiculo.tipo_veiculo || "Carro"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Anunciado em:</span>
-                        <span className="font-medium">{formatDate(veiculo.created_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Sidebar - Informações da Agência */}
-            <div className="lg:col-span-2 space-y-2 sm:space-y-4">
-              {/* Informações da Agência */}
-              <Card className="lg:sticky lg:top-6">
-                <CardContent className="p-3 sm:p-4">
-                  {loadingAgencia ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-                    </div>
-                  ) : dadosAgencia ? (
-                    <div className="space-y-4">
-                      {/* Header da Agência */}
-                      <div className="flex items-start gap-2">
-                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden">
-                          {dadosAgencia.logo_url ? (
-                            <Image
-                              src={dadosAgencia.logo_url || "/placeholder.svg"}
-                              alt={`Logo ${dadosAgencia.nome_fantasia}`}
-                              width={48}
-                              height={48}
-                              className="object-cover"
-                            />
-                          ) : (
-                            <Building2 className="h-6 w-6 text-gray-400" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-base">{dadosAgencia.nome_fantasia}</h3>
-                          <div className="flex items-center gap-1 text-sm text-gray-600">
-                            <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                            <span>{dadosAgencia.avaliacao || "4.8"}</span>
-                            <span>({dadosAgencia.total_avaliacoes || "127"} avaliações)</span>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="text-green-600 border-green-600">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Verificada
-                        </Badge>
-                      </div>
-
-                      <Separator />
-
-                      {/* Informações de Contato */}
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm">
-                          <MapPin className="h-4 w-4 text-gray-400" />
-                          <span>
-                            {dadosAgencia.cidade}, {dadosAgencia.estado}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="h-4 w-4 text-gray-400" />
-                          <span>Responde em até 2 horas</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Shield className="h-4 w-4 text-gray-400" />
-                          <span>Agência desde {new Date(dadosAgencia.created_at).getFullYear()}</span>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      {/* Botões de Contato */}
-                      <div className="space-y-2">
-                        <Button
-                          onClick={() => handleContact("whatsapp")}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm py-2"
-                        >
-                          <MessageCircle className="h-4 w-4 mr-1 sm:mr-2" />
-                          WhatsApp
-                        </Button>
-                        <div className="grid grid-cols-2 gap-1 sm:gap-2">
-                          <Button variant="outline" onClick={() => handleContact("phone")} className="flex-1 text-xs sm:text-sm py-2">
-                            <Phone className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                            Ligar
-                          </Button>
-                          <Button variant="outline" onClick={() => handleContact("email")} className="flex-1 text-xs sm:text-sm py-2">
-                            <Mail className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                            Email
-                          </Button>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      {/* Informações Adicionais */}
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">CNPJ:</span>
-                          <span className="font-medium">{formatCnpj(dadosAgencia.cnpj)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Telefone:</span>
-                          <span className="font-medium">
-                            {formatPhone(dadosAgencia.telefone_principal || dadosAgencia.whatsapp)}
-                          </span>
-                        </div>
-                        {dadosAgencia.site && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Site:</span>
-                            <a
-                              href={dadosAgencia.site}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-medium text-orange-600 hover:underline flex items-center gap-1"
-                            >
-                              <Globe className="h-3 w-3" />
-                              Visitar
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-600">Informações da agência não disponíveis</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Calculadora de Financiamento */}
-              <Card>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-base mb-3 flex items-center gap-2">
-                    <CreditCard className="h-5 w-5 text-orange-500" />
-                    Simular Financiamento
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm text-gray-600">Valor do veículo</label>
-                      <div className="text-base font-bold text-gray-900">{formatPrice(veiculo.preco || 0)}</div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-600">Entrada (30%)</label>
-                      <div className="text-base font-bold text-orange-600">
-                        {formatPrice((veiculo.preco || 0) * 0.3)}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-600">Parcelas estimadas (48x)</label>
-                      <div className="text-base font-bold text-gray-900">
-                        {formatPrice(((veiculo.preco || 0) * 0.7 * 1.15) / 48)}
-                      </div>
-                    </div>
-                    <Button variant="outline" className="w-full" onClick={handleSimulateFinancing}>
-                      Simular Financiamento
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+    <div 
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg w-full max-w-6xl max-h-[95vh] shadow-2xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-2 md:p-3 pb-2 border-b bg-white z-10 flex-shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm md:text-lg font-bold leading-tight flex-1 min-w-0">
+              <span className="block truncate">
+                {veiculo.marca_nome} {veiculo.modelo_nome} {veiculo.ano_fabricacao}
+              </span>
+            </h2>
+            <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsFavorito(!isFavorito)}
+                className="text-gray-500 hover:text-red-500 h-8 w-8 p-0"
+              >
+                <Heart className={`h-4 w-4 ${isFavorito ? "fill-red-500 text-red-500" : ""}`} />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleShare} className="text-gray-500 h-8 w-8 p-0">
+                <Share2 className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-2 sm:gap-4 p-2 sm:p-4 overflow-y-auto flex-1 min-h-0">
+          <div className="lg:col-span-3 space-y-2 sm:space-y-4">
+            <div className="relative">
+              {loadingImagens ? (
+                <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                </div>
+              ) : (
+                <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
+                  <Image
+                    src={imagens[currentImageIndex] || "/placeholder.svg"}
+                    alt={`${veiculo.marca_nome} ${veiculo.modelo_nome} - Foto ${currentImageIndex + 1}`}
+                    fill
+                    className="object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = "/placeholder.svg?height=400&width=600&text=Erro+ao+carregar"
+                    }}
+                  />
+                  
+                  <div className="absolute bottom-4 left-4 opacity-25 pointer-events-none">
+                    <Image
+                      src="https://ecdmpndeunbzhaihabvi.supabase.co/storage/v1/object/public/telas//3d%20sem%20fundo.png"
+                      alt="Marca d'água"
+                      width={60}
+                      height={60}
+                      className="object-contain"
+                    />
+                  </div>
+
+                  <div className="absolute top-2 left-2 flex flex-col gap-1">
+                    <Badge className="bg-orange-500 text-white text-xs px-2 py-1">DESTAQUE</Badge>
+                    {isVeiculoNovo(veiculo.created_at) && (
+                      <Badge className="bg-green-500 text-white text-xs px-2 py-1">NOVO</Badge>
+                    )}
+                    {veiculo.estado_veiculo === "Seminovo" && (
+                      <Badge className="bg-blue-500 text-white">SEMINOVO</Badge>
+                    )}
+                  </div>
+
+                  {imagens.length > 1 && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white border-0"
+                        onClick={prevImage}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white border-0"
+                        onClick={nextImage}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                        {imagens.map((_, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setCurrentImageIndex(index)}
+                            className={`w-2 h-2 rounded-full transition-all ${
+                              index === currentImageIndex ? "bg-white" : "bg-white/50"
+                            }`}
+                            aria-label={`Ir para foto ${index + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  <div className="absolute top-4 right-4 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                    {currentImageIndex + 1} / {imagens.length}
+                    {imagens.length > 1 && <span className="ml-1 text-xs opacity-75">fotos</span>}
+                  </div>
+
+                  {veiculo.video && (
+                    <div className="absolute bottom-4 right-4">
+                      <Badge className="bg-black/70 text-white flex items-center gap-1">
+                        <Play className="h-3 w-3" />
+                        Vídeo
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {imagens.length > 1 && (
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+                  {imagens.map((imagem, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`relative flex-shrink-0 w-16 h-12 rounded overflow-hidden border-2 transition-all ${
+                        index === currentImageIndex ? "border-orange-500" : "border-gray-200"
+                      }`}
+                    >
+                      <Image
+                        src={imagem}
+                        alt={`Thumbnail ${index + 1}`}
+                        fill
+                        className="object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/placeholder.svg?height=48&width=64&text=Erro"
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-gray-900">Preço</h3>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {formatPrice(veiculo.preco || 0)}
+                    </div>
+                    {veiculo.aceita_parcelamento && (
+                      <div className="text-sm text-gray-600">
+                        ou {veiculo.parcelas_maximas || 60}x de{" "}
+                        {formatPrice((veiculo.preco || 0) / (veiculo.parcelas_maximas || 60))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t my-4"></div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">Ano:</span>
+                    <span className="font-medium">{veiculo.ano_fabricacao}/{veiculo.ano_modelo}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Gauge className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">KM:</span>
+                    <span className="font-medium">
+                      {veiculo.quilometragem ? veiculo.quilometragem.toLocaleString() : "0"} km
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Fuel className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">Combustível:</span>
+                    <span className="font-medium">{veiculo.combustivel || "Não informado"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">Câmbio:</span>
+                    <span className="font-medium">{veiculo.cambio || "Não informado"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">Cor:</span>
+                    <span className="font-medium">{veiculo.cor || "Não informado"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Car className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">Portas:</span>
+                    <span className="font-medium">{veiculo.portas || "Não informado"}</span>
+                  </div>
+                </div>
+
+                {veiculo.observacoes && (
+                  <>
+                    <div className="border-t my-4"></div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2">Observações</h4>
+                      <p className="text-gray-600 text-sm leading-relaxed">{veiculo.observacoes}</p>
+                    </div>
+                  </>
+                )}
+
+                <div className="border-t my-4"></div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Shield className="h-4 w-4 text-green-500" />
+                    <span className="text-gray-600">Estado:</span>
+                    <Badge variant="secondary">{veiculo.estado_veiculo || "Usado"}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-600">Anunciado em:</span>
+                    <span className="font-medium">{formatDate(veiculo.created_at)}</span>
+                  </div>
+                </div>
+
+                {veiculo.aceita_parcelamento && (
+                  <>
+                    <div className="border-t my-4"></div>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CreditCard className="h-4 w-4 text-green-600" />
+                        <span className="font-medium text-green-800">Aceita Financiamento</span>
+                      </div>
+                      <div className="text-sm text-green-700">
+                        <div>Parcelas: até {veiculo.parcelas_maximas || 60}x</div>
+                        {veiculo.entrada_minima && (
+                          <div>Entrada mínima: {formatPrice(veiculo.entrada_minima)}</div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {veiculo.aceita_troca && (
+                  <div className="bg-blue-50 p-3 rounded-lg mt-3">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 text-blue-600" />
+                      <span className="font-medium text-blue-800">Aceita Troca</span>
+                    </div>
+                    <div className="text-sm text-blue-700 mt-1">
+                      Consulte condições com o vendedor
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-2 space-y-3">
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  {dadosAgencia?.logo_url ? (
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                      <Image
+                        src={dadosAgencia.logo_url}
+                        alt="Logo da agência"
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/placeholder.svg?height=48&width=48&text=Logo"
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="h-6 w-6 text-orange-600" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 truncate">
+                      {dadosAgencia?.nome_fantasia || dadosAgencia?.razao_social || "Vendedor"}
+                    </h3>
+                    <div className="flex items-center gap-1 mt-1">
+                      <div className="flex items-center">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className="h-3 w-3 fill-yellow-400 text-yellow-400"
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-gray-600">
+                        {dadosAgencia?.avaliacao || "4.8"}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({dadosAgencia?.total_avaliacoes || "127"} avaliações)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-sm">
+                  {dadosAgencia?.telefone_principal && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-gray-500" />
+                      <span className="text-gray-600">Telefone:</span>
+                      <span className="font-medium">
+                        {isAuthenticated ? formatPhone(dadosAgencia.telefone_principal) : maskPhone(dadosAgencia.telefone_principal)}
+                      </span>
+                    </div>
+                  )}
+                  {dadosAgencia?.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-500" />
+                      <span className="text-gray-600">Email:</span>
+                      <span className="font-medium text-xs">
+                        {isAuthenticated ? dadosAgencia.email : maskEmail(dadosAgencia.email)}
+                      </span>
+                    </div>
+                  )}
+                  {dadosAgencia?.cidade && dadosAgencia?.estado && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <span className="text-gray-600">Localização:</span>
+                      <span className="font-medium">
+                        {dadosAgencia.cidade}, {dadosAgencia.estado}
+                      </span>
+                    </div>
+                  )}
+                  {dadosAgencia?.site && (
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-gray-500" />
+                      <span className="text-gray-600">Site:</span>
+                      <a
+                        href={dadosAgencia.site}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-blue-600 hover:underline text-xs"
+                      >
+                        {dadosAgencia.site}
+                      </a>
+                    </div>
+                  )}
+                  {dadosAgencia?.cnpj && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-gray-500" />
+                      <span className="text-gray-600">CNPJ:</span>
+                      <span className="font-medium text-xs">
+                        {isAuthenticated ? formatCnpj(dadosAgencia.cnpj) : maskCnpj(dadosAgencia.cnpj)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t my-4"></div>
+
+                <div className="space-y-2">
+                  {!isAuthenticated && (
+                    <div className="bg-orange-50 p-3 rounded-lg mb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="h-4 w-4 text-orange-600" />
+                        <span className="font-medium text-orange-800 text-sm">Faça login para ver os contatos</span>
+                      </div>
+                      <p className="text-xs text-orange-700">
+                        Entre na sua conta para visualizar telefone, email e entrar em contato com o vendedor.
+                      </p>
+                    </div>
+                  )}
+                  <Button
+                    onClick={() => handleContact("whatsapp")}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    disabled={!dadosAgencia?.whatsapp && !dadosAgencia?.telefone_principal}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    WhatsApp
+                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (!isAuthenticated) {
+                          setShowLoginModal(true)
+                          return
+                        }
+                        handleContact("phone")
+                      }}
+                      disabled={!dadosAgencia?.telefone_principal}
+                    >
+                      <Phone className="h-4 w-4 mr-1" />
+                      Ligar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (!isAuthenticated) {
+                          setShowLoginModal(true)
+                          return
+                        }
+                        handleContact("email")
+                      }}
+                      disabled={!dadosAgencia?.email}
+                    >
+                      <Mail className="h-4 w-4 mr-1" />
+                      Email
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Banknote className="h-4 w-4" />
+                  Simular Financiamento
+                </h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Calcule as parcelas e veja as melhores condições para financiar este veículo.
+                </p>
+                <Button onClick={handleSimulateFinancing} className="w-full bg-blue-600 hover:bg-blue-700">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Simular Agora
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+      
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)}
+        message="Faça login para acessar as informações de contato e funcionalidades completas."
+      />
+    </div>
   )
 }

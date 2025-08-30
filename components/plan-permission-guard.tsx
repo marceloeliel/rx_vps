@@ -35,6 +35,7 @@ export function PlanPermissionGuard({
     loading, 
     canAddVehicle, 
     canFeatureVehicle,
+    hasUnlimitedAccess,
     getUsageInfo
   } = usePlanControl()
   
@@ -62,6 +63,14 @@ export function PlanPermissionGuard({
   }
 
   const checkPermission = (): { allowed: boolean; reason?: string; upgradeMessage?: string } => {
+    // Se tem acesso ilimitado concedido pelo admin, libera todos os recursos
+    if (hasUnlimitedAccess) {
+      return {
+        allowed: true,
+        reason: "Acesso ilimitado concedido pelo administrador"
+      }
+    }
+
     switch (requiredFeature) {
       case 'addVehicle': {
         const check = canAddVehicle()
@@ -111,8 +120,8 @@ export function PlanPermissionGuard({
       case 'apiAccess':
         return {
           allowed: ['empresarial', 'ilimitado'].includes(userPlan.id),
-          reason: !['empresarial', 'ilimitado'].includes(userPlan.id) ? 'Acesso à API disponível apenas nos planos Empresarial e Ilimitado' : undefined,
-          upgradeMessage: "Para acessar a API, faça upgrade para o plano Empresarial ou Ilimitado"
+          reason: !['empresarial', 'ilimitado'].includes(userPlan.id) ? 'Recurso disponível apenas nos planos Empresarial e Ilimitado' : undefined,
+          upgradeMessage: "Para acessar este recurso, faça upgrade para o plano Empresarial ou Ilimitado"
         }
       
       case 'adminPanel':

@@ -294,7 +294,6 @@ export function PlanMigrationPanel() {
                 <li>• Anúncios premium</li>
                 <li>• Suporte 24/7</li>
                 <li>• Relatórios completos</li>
-                <li>• Acesso à API</li>
               </ul>
             </div>
             

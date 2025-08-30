@@ -188,6 +188,27 @@ export async function checkUserAccess(userId: string): Promise<{
   subscription: UserSubscription | null
   reason?: string
 }> {
+  // Primeiro verificar se o usuário tem acesso ilimitado no perfil
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('unlimited_access, plano_atual')
+    .eq('id', userId)
+    .single()
+
+  if (!profileError && profile) {
+    // Se o usuário tem acesso ilimitado, permitir acesso imediatamente
+    if (profile.unlimited_access === true || 
+        profile.plano_atual === 'ilimitado' || 
+        profile.plano_atual === 'premium_plus' || 
+        profile.plano_atual === 'empresarial') {
+      return {
+        hasAccess: true,
+        subscription: null,
+        reason: 'Acesso ilimitado ativo'
+      }
+    }
+  }
+
   const subscription = await getUserActiveSubscription(userId)
 
   if (!subscription) {

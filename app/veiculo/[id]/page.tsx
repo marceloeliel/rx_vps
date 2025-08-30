@@ -44,6 +44,7 @@ import {
 } from "lucide-react"
 import type { Veiculo } from "@/lib/supabase/veiculos"
 import { createClient } from "@/lib/supabase/client"
+
 import { createLead } from "@/lib/supabase/vehicle-favorites"
 import type { User } from "@supabase/supabase-js"
 
@@ -68,11 +69,11 @@ interface DadosAgencia {
 }
 
 const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(price)
-}
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(price)
+  }
 
 const formatNumber = (num: number) => {
   return new Intl.NumberFormat("pt-BR").format(num)

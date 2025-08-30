@@ -187,13 +187,21 @@ export async function createLead(
 
   try {
     // Verificar se já existe um lead similar (evitar duplicatas)
-    const { data: existingLead } = await supabase
+    const { data: existingLeads, error: searchError } = await supabase
       .from('vehicle_leads')
-      .select('id, lead_type')
+      .select('id, lead_type, created_at')
       .eq('user_id', userId)
       .eq('vehicle_id', vehicleId)
-      .maybeSingle()
+      .order('created_at', { ascending: false })
+      .limit(1)
 
+    if (searchError) {
+      console.error('❌ [LEADS] Erro ao buscar lead existente:', searchError.message)
+      // Continuar com a criação mesmo assim
+    }
+
+    const existingLead = existingLeads && existingLeads.length > 0 ? existingLeads[0] : null
+    
     if (existingLead) {
       console.log('ℹ️ [LEADS] Lead já existe, atualizando tipo se necessário')
       
@@ -208,7 +216,7 @@ export async function createLead(
           })
           .eq('id', existingLead.id)
           .select()
-          .single()
+          .maybeSingle()
         
         if (updateError) {
           console.error('❌ [LEADS] Erro ao atualizar lead:', updateError.message)
@@ -219,10 +227,12 @@ export async function createLead(
         return { data: updatedLead, error: null }
       }
       
+      console.log('✅ [LEADS] Lead já existe com o mesmo tipo:', existingLead)
       return { data: existingLead as VehicleLead, error: null }
     }
 
-    const { data, error } = await supabase
+    // Tentar criar o lead
+    const { data: insertData, error } = await supabase
       .from('vehicle_leads')
       .insert({
         user_id: userId,
@@ -232,35 +242,65 @@ export async function createLead(
         contact_info: contactInfo || null
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
-      // Se for erro de duplicata, tentar buscar o lead existente
-      if (error.code === '23505' || error.message.includes('duplicate key')) {
-        console.log('ℹ️ [LEADS] Lead duplicado detectado, buscando existente')
-        const { data: existingData } = await supabase
+      // Se for erro de duplicata, tentar buscar o lead existente novamente
+      if (error.code === '23505' || error.message.includes('duplicate key') || error.message.includes('unique')) {
+        console.log('ℹ️ [LEADS] Lead duplicado detectado, buscando existente novamente')
+        const { data: existingDataArray, error: refetchError } = await supabase
           .from('vehicle_leads')
           .select('*')
           .eq('user_id', userId)
           .eq('vehicle_id', vehicleId)
-          .single()
+          .order('created_at', { ascending: false })
+          .limit(1)
         
-        if (existingData) {
+        const existingData = existingDataArray && existingDataArray.length > 0 ? existingDataArray[0] : null
+        
+        if (existingData && !refetchError) {
+          console.log('✅ [LEADS] Lead existente encontrado:', existingData)
           return { data: existingData, error: null }
+        }
+        
+        if (refetchError) {
+          console.error('❌ [LEADS] Erro ao buscar lead após duplicata:', refetchError.message)
         }
       }
       
+      // Se for erro de foreign key constraint, fornecer mensagem mais clara
+      if (error.code === '23503') {
+        const constraintInfo = {
+          message: 'Erro de referência: ID não encontrado na tabela relacionada',
+          code: error.code,
+          details: error.details || 'Verificar se user_id, vehicle_id e agency_id existem',
+          hint: error.hint || 'Verificar se os IDs passados são válidos',
+          userId,
+          vehicleId,
+          agencyId,
+          leadType,
+          fullError: error
+        }
+        console.error('❌ [LEADS] Erro de constraint de foreign key:', constraintInfo)
+        return { data: null, error: constraintInfo }
+      }
+      
       console.error('❌ [LEADS] Erro ao criar lead:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
+        message: error.message || 'Erro desconhecido',
+        code: error.code || 'N/A',
+        details: error.details || 'N/A',
+        hint: error.hint || 'N/A',
+        userId,
+        vehicleId,
+        agencyId,
+        leadType,
+        fullError: error
       })
       return { data: null, error }
     }
 
-    console.log('✅ [LEADS] Lead criado com sucesso:', data)
-    return { data, error: null }
+    console.log('✅ [LEADS] Lead criado com sucesso:', insertData)
+    return { data: insertData, error: null }
   } catch (error) {
     const errorInfo = {
       message: error instanceof Error ? error.message : 'Erro desconhecido',

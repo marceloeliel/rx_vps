@@ -102,7 +102,36 @@ export default function SubscriptionGuard({
         return
       }
 
-      // Se não tem acesso promocional, verificar assinatura paga
+      // Verificar se o usuário tem acesso ilimitado no perfil
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('unlimited_access, plano_atual')
+        .eq('id', user.id)
+        .single()
+
+      if (!profileError && profile) {
+        // Se o usuário tem acesso ilimitado, permitir acesso imediatamente
+        if (profile.unlimited_access === true || 
+            profile.plano_atual === 'ilimitado' || 
+            profile.plano_atual === 'premium_plus' || 
+            profile.plano_atual === 'empresarial') {
+          setAccessStatus({
+            hasAccess: true,
+            subscription: {
+              plan_type: profile.plano_atual,
+              status: 'unlimited',
+              end_date: null
+            },
+            reason: 'Acesso ilimitado ativo',
+            isPromotional: false,
+            promotionalAccess: promotionalAccess
+          })
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // Se não tem acesso ilimitado, verificar assinatura paga
       try {
         const response = await fetch(`/api/subscriptions?userId=${user.id}`)
         
